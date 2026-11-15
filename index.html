@@ -1,0 +1,2694 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CÓRTEX-70 v5 — Simulador didático de paciente virtual</title>
+<meta name="description" content="Simulador didático de paciente virtual em um único HTML: cerca de 160 parâmetros fisiológicos, 50 fármacos com farmacocinética, neurodegeneração, monitor em tempo real e relatório. Não é diagnóstico. Educational virtual patient simulator.">
+<meta name="keywords" content="paciente virtual, simulador médico, farmacocinética, neurodegeneração, Alzheimer, amiloide, tau, fisiologia, simulação, virtual patient, pharmacokinetics, neurodegeneration, physiology simulator">
+<meta name="author" content="segredosocultosdouniverso">
+<meta property="og:type" content="website">
+<meta property="og:title" content="CÓRTEX-70 v5 — Simulador didático de paciente virtual">
+<meta property="og:description" content="Fisiologia, farmacocinética e neurodegeneração simuladas em um único HTML. Didático, não é diagnóstico.">
+<meta property="og:locale" content="pt_BR">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="CÓRTEX-70 v5 — Simulador didático de paciente virtual">
+<meta name="twitter:description" content="Fisiologia, farmacocinética e neurodegeneração simuladas. Didático, não é diagnóstico.">
+<style>
+:root{--bg:#0f1419;--bg2:#1a1f2e;--card:#252b3d;--borda:#3a4259;--tx:#e8eaed;--tx2:#9aa0a6;--tx3:#5f6368;--acc:#4a9eff;--acc2:#7b61ff;--ok:#34d399;--warn:#fbbf24;--bad:#f87171;--mono:'Courier New',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.4}
+#topo{background:var(--bg2);border-bottom:1px solid var(--borda);padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:10}
+#topo button{background:var(--card);border:1px solid var(--borda);color:var(--tx);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;min-height:32px}
+#topo button:hover{background:var(--borda)}
+#topo button.prim{background:var(--acc);border-color:var(--acc)}
+#criacao{max-width:600px;margin:40px auto;padding:20px;background:var(--card);border-radius:12px}
+#criacao h1{color:var(--acc);margin-bottom:16px;font-size:20px}
+#criacao label{display:block;margin:10px 0 4px;color:var(--tx2);font-size:12px}
+#criacao input,#criacao select{width:100%;padding:8px;background:var(--bg2);border:1px solid var(--borda);border-radius:6px;color:var(--tx);font-size:13px}
+#criacao button{margin-top:16px;width:100%;padding:10px;background:var(--acc);border:none;border-radius:6px;color:#fff;font-size:14px;cursor:pointer}
+#app{display:none;flex-direction:column;gap:12px;padding:12px}
+.cartoes{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.cartao{background:var(--card);border:1px solid var(--borda);border-radius:8px;padding:8px;font-size:11px}
+.cartao small{color:var(--tx3);display:block;font-size:10px;text-transform:uppercase;margin-bottom:2px}
+.cartao b{font-family:var(--mono);font-size:16px;display:block;margin:2px 0}
+.cartao.ok b{color:var(--ok)}
+.cartao.bad b{color:var(--bad)}
+.cartao.warn b{color:var(--warn)}
+#monitor{background:var(--card);border:1px solid var(--borda);border-radius:8px;padding:10px}
+#monitor h3{color:var(--acc2);font-size:13px;margin-bottom:8px}
+#grafico-box{background:var(--card);border:1px solid var(--borda);border-radius:8px;padding:10px}
+#grafico-box canvas{width:100%;height:200px;background:var(--bg2);border-radius:6px}
+#log{background:var(--card);border:1px solid var(--borda);border-radius:8px;padding:10px;max-height:200px;overflow-y:auto;font-family:var(--mono);font-size:11px}
+#log div{padding:2px 0;border-bottom:1px solid var(--borda)}
+#log div:last-child{border:none}
+</style>
+</head>
+<body>
+<div id="criacao">
+<h1>🧠 CÓRTEX-70 v5</h1><p style="font-size:12px;color:#fbbf24;margin:0 0 10px">⚠ Simulador didático e de pesquisa. Não é diagnóstico nem orientação médica ou de dose. Não digite dados reais de pessoas.</p>
+<label>Nome do paciente</label><input id="c-nome" value="Paciente">
+<label>Idade</label><input id="c-idade" type="number" value="65" min="18" max="120">
+<label>Sexo</label><select id="c-sexo"><option value="M">Masculino</option><option value="F">Feminino</option></select>
+<label>Perfil clínico</label><select id="c-perfil">
+<option value="saudavel">Saudável</option>
+<option value="risco">Risco alto</option>
+<option value="mci">DCL (MCI)</option>
+<option value="alz_leve" selected>Alzheimer leve</option>
+<option value="vascular">Vascular</option>
+<option value="b12">Deficiência B12</option>
+</select>
+<label>Qualidade do sono</label><select id="c-sono">
+<option value="bom" selected>Bom</option>
+<option value="regular">Regular</option>
+<option value="ruim">Ruim</option>
+</select>
+<label>Semente (opcional)</label><input id="c-seed" type="number" placeholder="Ex: 12345">
+<button onclick="criarPacienteUI()">▶ Criar paciente</button>
+<div id="continuar-box"></div>
+</div>
+<div id="app">
+<div id="topo">
+<button onclick="avancarMin(60)">+1h</button>
+<button onclick="avancarMin(1440)">+1d</button>
+<button onclick="avancarMin(10080)">+7d</button>
+<button onclick="avancarMin(43200)">+30d</button>
+<button onclick="avancarMin(525600)">+1ano</button>
+<button onclick="togglePlay()" id="btn-play">▶ Play</button>
+<button onclick="exportarJSON()">💾 Save</button>
+<button onclick="document.getElementById('import-file').click()">📂 Load</button>
+<input type="file" id="import-file" accept=".json" onchange="importarJSON(this)" style="display:none">
+<span id="tempo" style="margin-left:auto;font-family:var(--mono);color:var(--acc)"></span>
+</div>
+<div class="cartoes" id="cartoes"></div>
+<div id="monitor"><h3>Monitor em tempo real</h3><div id="monitor-conteudo"></div></div>
+<div id="grafico-box">
+<h3>Gráfico</h3>
+<select id="graf-escala" onchange="desenharGrafico()" style="margin-bottom:8px;padding:6px;background:var(--bg2);border:1px solid var(--borda);border-radius:6px;color:var(--tx)">
+<option value="hora">Últimas horas</option>
+<option value="dia">Últimos dias</option>
+</select>
+<select id="graf-var" onchange="desenharGrafico()" style="margin-left:6px;margin-bottom:8px;padding:6px;background:var(--bg2);border:1px solid var(--borda);border-radius:6px;color:var(--tx)"></select>
+<canvas id="graf-canvas"></canvas>
+</div>
+<div id="log"><b>Log de eventos</b><div id="log-conteudo"></div></div>
+</div>
+
+<script>
+/* ================================================================
+CÓRTEX-70 v4 — PARTE 1/9: BASE, UTILITÁRIOS, REGISTRO
+================================================================ */
+var SCHEMA_VERSION=4, MOTOR_VERSION="v4-N1";
+var S=null, REG={}, REG_ORDER=[], DRUG_DEFS=[], DRUG_INDEX={};
+var EM_EXECUCAO=false, JOGANDO=false;
+var REGIOES=["hipocampo","temporal","frontal","parietal","occipital","talamus","cerebelo","tronco"];
+
+function clamp(v,a,b){return v<a?a:(v>b?b:v);}
+function lerp(a,b,k){return a+(b-a)*k;}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];});}
+function fmt(v){if(v===undefined||v===null||isNaN(v))return"-";var a=Math.abs(v);return a>=1000?v.toFixed(0):(a>=100?v.toFixed(1):v.toFixed(2));}
+function fmtT(m){var d=Math.floor(m/1440),h=Math.floor((m%1440)/60),min=m%60;return"d "+d+" "+(h<10?"0":"")+h+"h"+(min<10?"0":"")+min+"m";}
+function rand(){var t=(S.rng.s+=0x6D2B79F5);t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;}
+function randN(){return Math.sqrt(-2*Math.log(rand()+1e-12))*Math.cos(6.283185307*rand());}
+function rngG(){return randN();}
+function addEvento(txt){if(!S)return;S.events.push({t:S.t,txt:txt});if(S.events.length>200)S.events.shift();addLog("evento",txt);}
+function addLog(tipo,txt){if(!S)return;S.log.push({t:S.t,tipo:tipo,txt:txt});if(S.log.length>300)S.log.splice(0,S.log.length-300);}
+
+/* ---------- registro de parâmetros ---------- */
+function P(id,tipo,grupo,valor,unidade,o){
+o=o||{};
+if(!REG[id])REG_ORDER.push(id);
+REG[id]={id:id,tipo:tipo,grupo:grupo,unidade:unidade,valor:valor,basal:valor,
+faixa_fisio:o.fis||null,faixa_plaus:o.plaus||null,escopo:o.escopo||null,
+travado:null,favorito:false,modo:"real"};
+}
+function getP(id){var v=S&&S.params[id];return v===undefined?(REG[id]?REG[id].valor:0):v;}
+function setP(id,v,src){
+var r=REG[id];if(!r)return;
+if(typeof v==="string"){S.params[id]=v;return;}
+if(isNaN(v))return;
+if(src==="motor"){if(r.travado==="freeze")return;if(r.travado==="clamp")v=r.valor;}
+if(r.modo!=="deus"&&r.faixa_plaus)v=clamp(v,r.faixa_plaus[0],r.faixa_plaus[1]);
+S.params[id]=v;
+if(src==="trava"&&r.travado==="clamp")r.valor=v;
+}
+function statusDe(id,v){var r=REG[id];if(!r||!r.faixa_fisio)return"";if(v<r.faixa_fisio[0]||v>r.faixa_fisio[1])return"bad";return"ok";}
+function efeito(p){return(S&&S.fx&&S.fx[p])||0;}
+function idadeBiologicaReal(){return getP("idade_biologica");}
+
+var renderTudo=function(){};
+var stepFarmacos=function(){S.fx={};S.fxLento={};};
+var garantirFarmacos=function(){if(!S.drugs)S.drugs=[];};
+/* ================================================================
+CÓRTEX-70 v4 — PARTE 2/9: CATÁLOGO DE PARÂMETROS + CRIAÇÃO
+================================================================ */
+
+/* ---------- catálogo de parâmetros (~160) ---------- */
+(function(){
+var L = [
+// PACIENTE E MORTE
+["idade","paciente",65,"anos",[0,120],[0,120]],
+["idade_biologica","paciente",65,"anos",[0,90],[0,130]],
+["sexo","paciente","M","M/F",["M","F"],["M","F"]],
+["vivo","morte",1,"0/1",[1,1],[0,1]],
+["risco_morte_ano","morte",1,"%/ano",[0,3],[0,100]],
+
+// VITAIS
+["pas","vitais",120,"mmHg",[90,130],[40,260]],
+["pad","vitais",78,"mmHg",[60,85],[20,160]],
+["pam","vitais",92,"mmHg",[70,105],[30,200]],
+["fc","vitais",70,"bpm",[55,90],[20,220]],
+["fr","vitais",16,"rpm",[12,20],[4,40]],
+["temp","vitais",36.6,"°C",[36.1,37.2],[34,42]],
+["spo2","vitais",97,"%",[94,100],[50,100]],
+
+// GASES E ÁCIDO-BÁSICO
+["po2","gases",95,"mmHg",[80,100],[40,150]],
+["pco2","gases",40,"mmHg",[35,45],[15,80]],
+["ph","gases",7.4,"",[7.35,7.45],[7.0,7.8]],
+["hco3","gases",24,"mEq/L",[22,26],[10,40]],
+["be","gases",0,"mEq/L",[-2,2],[-15,15]],
+["lactato","gases",1.2,"mmol/L",[0.5,2.0],[0.1,20]],
+
+// HEMOGRAMA
+["hb","hemograma",14,"g/dL",[12,17],[6,20]],
+["ht","hemograma",42,"%",[36,50],[20,60]],
+["leucocitos","hemograma",7.0,"mil/µL",[4,11],[1,30]],
+["neutrofilos","hemograma",60,"%",[40,75],[0,100]],
+["linfocitos","hemograma",30,"%",[20,45],[0,100]],
+["plaquetas","hemograma",250,"mil/µL",[150,400],[50,600]],
+
+// METABOLISMO
+["glicose","metabolismo",92,"mg/dL",[70,99],[20,600]],
+["insulina","metabolismo",8,"µU/mL",[2,20],[0,100]],
+["homa_ir","metabolismo",1.5,"",[0.5,2.5],[0.2,20]],
+["colesterol_total","metabolismo",180,"mg/dL",[150,200],[100,350]],
+["ldl","metabolismo",100,"mg/dL",[70,130],[30,250]],
+["hdl","metabolismo",55,"mg/dL",[40,70],[20,100]],
+["triglicerideos","metabolismo",120,"mg/dL",[70,150],[30,500]],
+["acido_urico","metabolismo",5.5,"mg/dL",[3.5,7.2],[1,12]],
+["pcr","metabolismo",1.5,"mg/L",[0,3],[0,50]],
+["albumina","metabolismo",4.2,"g/dL",[3.5,5.0],[2,6]],
+["creatinina","metabolismo",1.0,"mg/dL",[0.7,1.3],[0.3,10]],
+["tfg","metabolismo",90,"mL/min",[60,120],[10,150]],
+["ureia","metabolismo",35,"mg/dL",[15,45],[5,100]],
+["tgo","metabolismo",25,"U/L",[10,40],[5,200]],
+["tgp","metabolismo",28,"U/L",[10,40],[5,300]],
+["ggt","metabolismo",30,"U/L",[10,60],[5,300]],
+["fa","metabolismo",80,"U/L",[40,120],[20,300]],
+["bilirrubina_total","metabolismo",0.8,"mg/dL",[0.3,1.2],[0.1,20]],
+
+// ESTILO DE VIDA
+["atividade_fisica","estilo",1,"0-3",[0,3],[0,3]],
+["dieta_score","estilo",0.6,"0-1",[0,1],[0,1]],
+["estresse","estilo",30,"0-100",[0,50],[0,100]],
+["tabagismo","estilo",0,"maços/ano",[0,0],[0,80]],
+["alcool","estilo",0,"doses/sem",[0,2],[0,20]],
+
+// NEUROQUÍMICA
+["humor","neuroquimica",60,"0-100",[40,100],[0,100]],
+["dopamina","neuroquimica",100,"%",[70,130],[0,300]],
+["serotonina","neuroquimica",100,"%",[70,130],[0,300]],
+["noradrenalina","neuroquimica",100,"%",[70,130],[0,300]],
+["gaba","neuroquimica",100,"%",[70,130],[0,300]],
+["glutamato","neuroquimica",100,"%",[70,130],[0,300]],
+["acetilcolina","neuroquimica",100,"%",[70,130],[10,400]],
+["bdnf","neuroquimica",100,"%",[70,140],[10,300]],
+["ngf","neuroquimica",100,"%",[70,130],[10,300]],
+
+// SONO
+["sono_horas","sono",7.5,"h",[6.5,9],[0,14]],
+["sono_fase","sono",0,"0-4",[0,4],[0,4]],
+["apneia_iah","sono",2,"ev/h",[0,5],[0,100]],
+["sonolencia","sono",20,"0-100",[0,30],[0,100]],
+
+// CELULAR
+["ros","celular",10,"a.u.",[5,15],[0,200]],
+["mito_potencial","celular",100,"%",[80,110],[5,130]],
+["mtdna_integridade","celular",95,"%",[80,110],[5,110]],
+["proteassoma","celular",100,"%",[80,110],[5,130]],
+["autofagia","celular",100,"%",[80,130],[5,300]],
+["limpeza_celular","celular",100,"%",[80,130],[5,300]],
+["p16_sasp","celular",5,"a.u.",[0,15],[0,100]],
+["sod","celular",100,"%",[80,120],[20,200]],
+["catalase","celular",100,"%",[80,120],[20,200]],
+["glutationa","celular",100,"%",[80,120],[20,200]],
+["nad","celular",100,"%",[70,130],[10,200]],
+["sirt1","celular",100,"%",[70,130],[10,200]],
+["ampk","celular",100,"%",[70,130],[10,200]],
+
+// INFLAMAÇÃO
+["il6","inflamacao",2,"pg/mL",[0,5],[0,200]],
+["il1b","inflamacao",1,"pg/mL",[0,3],[0,100]],
+["tnf_alfa","inflamacao",3,"pg/mL",[0,8],[0,200]],
+["microglia_m1","inflamacao",15,"%",[5,30],[0,100]],
+["microglia_m2","inflamacao",85,"%",[70,95],[0,100]],
+
+// BHE E MICROCIRCULAÇÃO
+["bhe_perm","bhe",10,"%",[0,20],[0,100]],
+["cbf","bhe",50,"mL/100g/min",[40,60],[10,100]],
+["ppc","bhe",70,"mmHg",[60,90],[20,120]],
+["pic","bhe",10,"mmHg",[5,15],[0,40]],
+
+// GENÉTICA
+["apoe_risco","genetica",0,"0-2",[0,0],[0,2]],
+["carga_genetica","genetica",0,"0-3",[0,1],[0,3]],
+["reserva_cognitiva","cognicao",50,"0-100",[20,100],[0,100]],
+
+// AMILOIDE
+["carga_amiloide","amiloide",5,"CL",[0,20],[0,150]],
+["placa_amiloide","amiloide",0,"0-100",[0,10],[0,100]],
+["depuracao_ab","amiloide",100,"%",[80,120],[5,250]],
+
+// EXAMES
+["ptau217","exames",0.3,"pg/mL",[0,0.6],[0,100]],
+["nfl","exames",12,"pg/mL",[5,25],[0,500]],
+["gfap","exames",80,"pg/mL",[40,150],[0,2000]],
+["pet_amiloide","exames",5,"CL",[0,20],[0,150]],
+["liquor_ab42","exames",900,"pg/mL",[600,1500],[100,2000]],
+["rm_vol_hipocampo","exames",100,"% do basal",[85,110],[30,110]],
+
+// COGNIÇÃO
+["mmse","cognicao",29,"0-30",[26,30],[0,30]],
+["cdr","cognicao",0,"0-3",[0,0.5],[0,3]],
+["estagio","cognicao",0,"0-5",[0,0],[0,5]],
+["memoria","cognicao",95,"0-100",[70,100],[0,100]],
+["executiva","cognicao",95,"0-100",[70,100],[0,100]],
+["linguagem","cognicao",95,"0-100",[70,100],[0,100]],
+["orientacao","cognicao",95,"0-100",[70,100],[0,100]],
+
+// CORPO
+["massa_muscular","corpo",100,"%",[80,120],[30,150]],
+["densidade_ossea","corpo",100,"%",[85,115],[40,130]],
+["imunocompetencia","corpo",100,"%",[70,120],[20,150]],
+["pele_score","corpo",100,"%",[70,120],[20,150]],
+
+// OUTROS
+["saudavel_celular","celular",95,"0-100",[70,100],[0,100]],
+["regeneracao_score","celular",60,"0-100",[30,100],[0,100]],
+["vigor_global","cognicao",90,"0-100",[60,100],[0,100]],
+["neurogenese","celular",50,"%",[30,120],[0,300]],
+["plasticidade_sinaptica","celular",100,"%",[70,130],[10,200]],
+["mielina_score","celular",100,"%",[80,120],[30,150]],
+["dna_integrity","celular",95,"%",[85,105],[30,110]],
+["metilacao_dna","celular",100,"%",[80,120],[30,150]],
+["reparo_dna","celular",100,"%",[80,120],[30,150]]
+];
+
+for(var i=0;i<L.length;i++){ 
+  var x=L[i]; 
+  P(x[0],"estado",x[1],x[2],x[3],{fis:x[4],plaus:x[5]}); 
+}
+
+// Regiões cerebrais (neurônios, sinapses, saúde, tau)
+for(var j=0;j<REGIOES.length;j++){ 
+  var r=REGIOES[j];
+  P("neuronio_"+r,"estado","neuronios",100,"%",{escopo:"regiao:"+r,fis:[90,100],plaus:[0,100]});
+  P("sinapse_"+r,"estado","neuronios",100,"%",{escopo:"regiao:"+r,fis:[85,100],plaus:[0,100]});
+  P("saude_"+r,"estado","neuronios",95,"%",{escopo:"regiao:"+r,fis:[70,100],plaus:[0,100]});
+  P("tau_"+r,"estado","tau_regional",0,"carga",{escopo:"regiao:"+r,fis:[0,10],plaus:[0,100]});
+}
+})();
+
+/* ---------- criação de estado ---------- */
+var PESO_COG = {hipocampo:0.34,temporal:0.22,frontal:0.2,parietal:0.14,occipital:0.02,talamus:0.04,cerebelo:0.02,tronco:0.02};
+
+function novoEstado(cfg, seed){
+  var p={}; for(var id in REG) p[id]=REG[id].basal;
+  S = { schema_version:SCHEMA_VERSION, motor_version:MOTOR_VERSION, t:0, seed:seed||1, rng:{s:seed||1}, cfg:cfg||{},
+    params:p, log:[], events:[], fx:{}, fxLento:{}, histMin:[], histHora:[], histDia:[], ultHora:-1, ultDia:-1,
+    morto:false, contHora:0, drugs:[], perfilExtra:null, sonoMin:0, n3min:0, remmin:0,
+    geneApoeFeito:0, geneBdnfAtivo:0, imobilidade:0 };
+  return S;
+}
+
+function criarPaciente(cfg){
+  var c = { nome:cfg.nome||"Paciente", idade:cfg.idade||65, sexo:cfg.sexo||"M", sono:cfg.sono||"bom", 
+            perfil:cfg.perfil||"saudavel", seed:cfg.seed||Math.floor(Math.random()*1e9)+1 };
+  novoEstado(c, c.seed);
+  for(var id in REG){ REG[id].valor=REG[id].basal; if(REG[id].travado!=="clamp") REG[id].travado=null; }
+  
+  setP("idade",c.idade,"trava"); 
+  setP("sexo",c.sexo,"trava");
+  setP("idade_biologica",c.idade+(c.perfil==="risco"?4:0),"trava");
+  
+  // Ajustes por sexo
+  if(c.sexo==="F"){
+    setP("hb",13,"trava"); setP("ht",39,"trava"); setP("creatinina",0.8,"trava");
+  }
+  
+  var K = {
+    saudavel:{},
+    risco:{apoe_risco:1,carga_amiloide:18,pas:142,homa_ir:3.2,estresse:60,sono_horas:6,ldl:145,triglicerideos:180},
+    mci:{carga_amiloide:45,ptau217:1.2,apoe_risco:1,reserva_cognitiva:45,nfl:28,gfap:140,
+         tau_hipocampo:15,tau_temporal:8,neuronio_hipocampo:88,neuronio_temporal:94},
+    alz_leve:{carga_amiloide:75,ptau217:2.4,apoe_risco:2,reserva_cognitiva:40,nfl:35,gfap:180,mmse:24,cdr:0.5,
+              tau_hipocampo:35,tau_temporal:28,tau_parietal:12,tau_frontal:8,
+              neuronio_hipocampo:72,neuronio_temporal:80,neuronio_parietal:92,neuronio_frontal:95,neuronio_tronco:98},
+    vascular:{pas:158,pad:94,bhe_perm:30,homa_ir:4,carga_amiloide:20,apneia_iah:18,ldl:160,pcr:4,
+              neuronio_frontal:94,neuronio_parietal:95},
+    b12:{humor:40,dopamina:80,reserva_cognitiva:40,estresse:55,hb:10}
+  }[c.perfil] || {};
+  
+  for(var k in K){ 
+    setP(k,K[k],"trava"); 
+  }
+  
+  // Ajuste de sono
+  if(c.sono!=="bom"){
+    setP("sono_horas",c.sono==="regular"?6.3:5,"trava");
+  }
+  
+  addLog("fx","Paciente criado: "+c.nome+" ("+c.perfil+", "+c.idade+" anos, seed "+c.seed+")");
+  return S;
+}
+
+function criarPacienteUI(){
+  var cfg={
+    nome:document.getElementById("c-nome").value,
+    idade:parseInt(document.getElementById("c-idade").value)||65,
+    sexo:document.getElementById("c-sexo").value,
+    perfil:document.getElementById("c-perfil").value,
+    sono:document.getElementById("c-sono").value,
+    seed:parseInt(document.getElementById("c-seed").value)||null
+  };
+  criarPaciente(cfg);
+  document.getElementById("criacao").style.display="none";
+  document.getElementById("app").style.display="flex";
+  renderTudo();
+}
+window.criarPacienteUI=criarPacienteUI;
+/* ================================================================
+CÓRTEX-70 v4 — PARTE 3/9: MOTOR (3 CAMADAS) + TICK + HISTÓRICO
+Inclui C2 (escalas), C4 (acetilcolina), C6 (perda neuronal calibrada),
+dinâmica de pad/pam/temp/ph/cbf, tau regional, envelhecimento e morte.
+================================================================ */
+
+/* ---------- camada RÁPIDA (1 min) ---------- */
+var _fase = 0;
+function stepFast(){
+  var h=(S.t/60)%24, dormindo=(h>=23||h<6.5)?1:0;
+  setP("sono_fase",dormindo?2.5+(h<3?0.6:0):0,"motor");
+  var noiteN3=(getP("sono_fase")>=2.5&&getP("sono_fase")<3.5)?1:0.3;
+  
+  // ROS (C2 aplicado)
+  var rosAlvo=8+0.08*getP("estresse")+0.15*Math.max(0,100-getP("mito_potencial"))+0.03*Math.max(0,100-getP("autofagia"))+efeito("ros");
+  setP("ros",clamp(getP("ros")+(rosAlvo-getP("ros"))*0.05/1440,0,200),"motor");
+  
+  // Mitocôndria (C2 aplicado)
+  var mitoAlvo=100-0.4*Math.max(0,getP("ros")-12)-0.05*Math.max(0,getP("idade")-50)+3*(noiteN3-0.3)+2*getP("atividade_fisica");
+  setP("mito_potencial",getP("mito_potencial")+(clamp(mitoAlvo,5,110)-getP("mito_potencial"))*0.02/1440,"motor");
+  
+  // mtDNA (C2 aplicado)
+  setP("mtdna_integridade",clamp(getP("mtdna_integridade")+(-0.001*Math.max(0,getP("ros")-18)+0.002)/1440,5,110),"motor");
+  
+  // Proteassoma (C2 aplicado)
+  setP("proteassoma",getP("proteassoma")+(-0.01*getP("carga_amiloide")/5-0.01*getP("ptau217")+0.015*(getP("sono_fase")>=2.5&&getP("sono_fase")<3.5?1:0.2))/1440,"motor");
+  
+  // p16 SASP (C2 aplicado)
+  setP("p16_sasp",clamp(getP("p16_sasp")+(0.002+0.0004*getP("idade_biologica")-0.001*getP("autofagia")/100*4)/1440,0,100),"motor");
+  
+  // BDNF (C2 aplicado)
+  setP("bdnf",clamp(lerp(getP("bdnf"),100+12*getP("atividade_fisica")-0.25*Math.max(0,getP("estresse")-30)+efeito("bdnf"),0.0005),10,300),"motor");
+  
+  // Acetilcolina (C4 aplicado: lerp em vez de decaimento)
+  setP("acetilcolina",clamp(lerp(getP("acetilcolina"),100+efeito("acetilcolina")-0.4*Math.max(0,50-getP("sono_horas")*7),0.01),10,400),"motor");
+  
+  // Vitais com variabilidade (pad, pam, temp, fr dinâmicos)
+  var vs=(S.t%5)===0?randN():0;
+  if(vs!==0){
+    setP("fc",clamp(lerp(getP("fc"),68+0.2*getP("estresse")-4*dormindo+vs*1.2,0.2),30,200),"motor");
+    setP("spo2",clamp(97.5-0.15*getP("apneia_iah")*dormindo+vs*0.15,60,100),"motor");
+    setP("pas",clamp(lerp(getP("pas"),118+0.3*getP("estresse")-5*dormindo+vs*0.8,0.1),70,200),"motor");
+    setP("fr",clamp(lerp(getP("fr"),15+0.05*getP("estresse")-2*dormindo+vs*0.3,0.1),8,30),"motor");
+  }
+  
+  // PAD e PAM derivados de PAS
+  setP("pad",clamp(getP("pas")*0.65+vs*0.3,40,130),"motor");
+  setP("pam",clamp(getP("pad")+(getP("pas")-getP("pad"))/3,50,150),"motor");
+  
+  // Temperatura com ciclo circadiano
+  var tempAlvo=36.6+0.3*Math.cos(2*Math.PI*(h-16)/24)-0.2*dormindo;
+  setP("temp",clamp(lerp(getP("temp"),tempAlvo,0.05),35,38.5),"motor");
+  
+  // Gases
+  setP("po2",clamp(lerp(getP("po2"),95-0.3*getP("apneia_iah")*dormindo+vs*0.5,0.05),50,120),"motor");
+  setP("pco2",clamp(lerp(getP("pco2"),40+0.2*getP("apneia_iah")*dormindo,0.05),25,60),"motor");
+  
+  // pH por Henderson-Hasselbalch simplificado
+  var phAlvo=6.1+Math.log10(24/Math.max(1,getP("pco2")*0.03));
+  setP("ph",clamp(lerp(getP("ph"),phAlvo,0.1),7.0,7.8),"motor");
+  setP("hco3",clamp(lerp(getP("hco3"),24+0.4*(getP("pco2")-40),0.02),10,40),"motor");
+  
+  // CBF (fluxo sanguíneo cerebral)
+  var cbfAlvo=50+0.3*getP("pas")-0.2*Math.max(0,getP("idade")-50)-0.1*getP("bhe_perm");
+  setP("cbf",clamp(lerp(getP("cbf"),cbfAlvo,0.01),15,90),"motor");
+}
+
+/* ---------- camada MÉDIA (1 h) ---------- */
+function stepMid(){
+  // Glicose e HOMA-IR
+  var gAlvo=82+6*getP("homa_ir")+0.15*getP("estresse")+efeito("glicose");
+  setP("glicose",lerp(getP("glicose"),gAlvo,0.3),"motor");
+  var homaAlvo=1.0+0.03*Math.max(0,getP("idade")-40)+0.02*Math.max(0,getP("estresse")-30)-0.2*getP("atividade_fisica")+efeito("homa_ir");
+  setP("homa_ir",clamp(lerp(getP("homa_ir"),homaAlvo,0.002),0.2,20),"motor");
+  
+  // Inflamação
+  var inf=1.5+0.02*getP("p16_sasp")+0.01*Math.max(0,getP("carga_amiloide")-20)+0.03*getP("estresse")/10+0.5*(getP("bhe_perm")-10)/10;
+  setP("il6",lerp(getP("il6"),inf,0.05),"motor");
+  setP("microglia_m1",lerp(getP("microglia_m1"),clamp(10+3*getP("il6")+0.15*getP("carga_amiloide"),0,100),0.03),"motor");
+  
+  // BHE
+  setP("bhe_perm",clamp(getP("bhe_perm")+(0.2*Math.max(0,getP("pas")-135)/10+0.1*getP("il6")-0.3)/24,0,100),"motor");
+  
+  // Depuração de amiloide
+  var dep=100-0.2*Math.max(0,getP("idade")-50)+0.3*(getP("sono_horas")-6)*5+5*getP("atividade_fisica")-0.4*getP("apoe_risco")*10+(S.fxLento["depuracao_ab"]||0);
+  setP("depuracao_ab",lerp(getP("depuracao_ab"),clamp(dep,10,200),0.02),"motor");
+  
+  // Autofagia e limpeza
+  setP("autofagia",lerp(getP("autofagia"),clamp(100-0.3*Math.max(0,getP("idade")-40)+5*getP("atividade_fisica")+efeito("autofagia"),20,250),0.01),"motor");
+  setP("limpeza_celular",lerp(getP("limpeza_celular"),getP("autofagia"),0.02),"motor");
+  
+  // Neurotransmissores
+  setP("dopamina",lerp(getP("dopamina"),100-0.4*Math.max(0,getP("idade")-50)+efeito("dopamina"),0.01),"motor");
+  setP("serotonina",lerp(getP("serotonina"),100-0.3*Math.max(0,getP("estresse")-30)+efeito("serotonina"),0.01),"motor");
+  setP("humor",clamp(lerp(getP("humor"),65-0.3*getP("estresse")+0.1*(getP("dopamina")-100)+0.1*(getP("serotonina")-100)+efeito("humor")-0.2*Math.max(0,6.5-getP("sono_horas"))*10,0.02),0,100),"motor");
+  
+  // Hemograma e metabolismo
+  setP("hb",clamp(lerp(getP("hb"),14-0.01*Math.max(0,getP("idade")-50)+0.5*getP("albumina")/4,0.001),8,18),"motor");
+  setP("leucocitos",clamp(lerp(getP("leucocitos"),7+0.1*getP("il6")+0.05*getP("pcr"),0.01),2,20),"motor");
+  setP("plaquetas",clamp(lerp(getP("plaquetas"),250-0.5*getP("il6"),0.005),100,450),"motor");
+  
+  // Lipídios
+  setP("ldl",clamp(lerp(getP("ldl"),100+1.5*getP("homa_ir")-0.3*getP("atividade_fisica")+efeito("ldl"),0.005),40,250),"motor");
+  setP("hdl",clamp(lerp(getP("hdl"),55+0.5*getP("atividade_fisica")-0.2*getP("homa_ir"),0.005),25,80),"motor");
+  setP("triglicerideos",clamp(lerp(getP("triglicerideos"),120+3*getP("homa_ir")-2*getP("atividade_fisica"),0.005),50,400),"motor");
+  
+  // Função renal e hepática
+  setP("creatinina",clamp(lerp(getP("creatinina"),1.0+0.005*Math.max(0,getP("idade")-50)+0.01*getP("pas")/10,0.002),0.5,5),"motor");
+  setP("tfg",clamp(lerp(getP("tfg"),90-0.3*Math.max(0,getP("idade")-40)-0.1*getP("pas"),0.002),20,130),"motor");
+  setP("tgo",clamp(lerp(getP("tgo"),25+0.5*getP("il6"),0.01),10,150),"motor");
+  setP("tgp",clamp(lerp(getP("tgp"),28+0.6*getP("il6")+0.3*getP("homa_ir"),0.01),10,200),"motor");
+}
+
+/* ---------- camada LENTA (1 dia) — perda neuronal com C6 ---------- */
+function stepSlow(){
+  var idade=getP("idade"), ab=getP("carga_amiloide"), reserva=getP("reserva_cognitiva")/100;
+  
+  // Amiloide
+  var prod=0.0035*(1+0.5*getP("apoe_risco")+0.02*Math.max(0,idade-50)+0.01*getP("il6"))*(1+ab/50);
+  var lim=getP("depuracao_ab")/100*(0.00006*ab+0.0035);
+  setP("carga_amiloide",clamp(ab+prod-lim*1.0,0,150),"motor");
+  setP("placa_amiloide",lerp(getP("placa_amiloide"),clamp(getP("carga_amiloide")*0.9,0,100),0.01),"motor");
+  
+  // Tau regional (cresce com amiloide, estadiamento Braak)
+  var W={hipocampo:1,temporal:0.8,parietal:0.4,frontal:0.35,occipital:0.05,talamus:0.1,cerebelo:0.03,tronco:0.1};
+  for(var q in W){
+    setP("tau_"+q,getP("tau_"+q)+(0.001+0.0008*Math.max(0,ab-15))*W[q],"motor");
+  }
+  
+  // Anti-amiloides: remoção gradual (fx negativo vem do N2)
+  if(S.fx.carga_amiloide) setP("carga_amiloide",getP("carga_amiloide")+S.fx.carga_amiloide*0.004,"motor");
+  
+  // Perda neuronal (C6 aplicado: 1.5x e 2x)
+  var def=0, syn=0, r, t, perda, dano;
+  for(var i=0;i<REGIOES.length;i++){ 
+    r=REGIOES[i]; t=getP("tau_"+r);
+    dano=0.0012+0.00012*t+0.00006*Math.max(0,ab-20)+0.0002*Math.max(0,getP("ros")-15)+0.0002*Math.max(0,getP("microglia_m1")-25);
+    perda=dano*(1-0.5*reserva)-0.0002*(getP("neurogenese")/100)*(r==="hipocampo"?1:0.2);
+    setP("neuronio_"+r,getP("neuronio_"+r)-Math.max(0,perda*1.5),"motor"); // C6
+    setP("sinapse_"+r,clamp(getP("neuronio_"+r)-0.05*t-0.02*Math.max(0,ab-20)*(PESO_COG[r]>0.1?1:0.3),0,100),"motor");
+    setP("saude_"+r,clamp(0.5*getP("neuronio_"+r)+0.3*getP("sinapse_"+r)+0.2*getP("mito_potencial"),0,100),"motor");
+    def+=PESO_COG[r]*(100-getP("sinapse_"+r));
+  }
+  
+  // Cognição
+  var mmse=clamp(30-0.5*Math.max(0,def-2-0.06*getP("reserva_cognitiva")*0.5)-0.02*Math.max(0,idade-70)*0,0,30);
+  setP("mmse",lerp(getP("mmse"),mmse,0.2),"motor");
+  var m=getP("mmse");
+  setP("cdr",m>=27?0:(m>=22?0.5:(m>=15?1:(m>=8?2:3))),"motor");
+  setP("estagio",m>=27?0:(m>=22?1:(m>=15?2:(m>=8?3:4))),"motor");
+  setP("memoria",clamp(100-1.8*(100-getP("sinapse_hipocampo"))-0.6*(100-getP("sinapse_temporal")),0,100),"motor");
+  setP("executiva",clamp(100-1.5*(100-getP("sinapse_frontal"))-0.5*(100-getP("sinapse_parietal")),0,100),"motor");
+  
+  // Exames
+  setP("rm_vol_hipocampo",clamp(getP("neuronio_hipocampo")*0.6+40,30,110),"motor");
+  setP("pet_amiloide",getP("carga_amiloide"),"motor");
+  setP("liquor_ab42",clamp(1100-6*getP("carga_amiloide"),100,1500),"motor");
+  setP("ptau217",clamp(Math.max(0.3+0.03*getP("carga_amiloide"),getP("ptau217")*0.999),0,100),"motor");
+  setP("nfl",clamp(lerp(getP("nfl"),8+0.25*Math.max(0,idade-30)+3*(100-getP("neuronio_hipocampo")),0.05),3,500),"motor");
+  setP("gfap",clamp(lerp(getP("gfap"),60+0.8*getP("microglia_m1")+1.5*getP("carga_amiloide"),0.05),10,2000),"motor");
+  
+  // Scores gerais
+  setP("saudavel_celular",clamp(0.4*getP("mito_potencial")+0.3*getP("proteassoma")+0.3*getP("mtdna_integridade")-0.3*getP("p16_sasp"),0,100),"motor");
+  setP("regeneracao_score",clamp(0.5*getP("neurogenese")+0.3*getP("bdnf")*0.6+10,0,100),"motor");
+  setP("vigor_global",clamp(0.35*getP("saudavel_celular")+0.25*getP("memoria")+0.2*getP("executiva")+0.2*getP("vigor_global"),0,100),"motor");
+  setP("neurogenese",clamp(lerp(getP("neurogenese"),50+0.6*(getP("bdnf")-100)+8*getP("atividade_fisica")-0.3*Math.max(0,idade-50)-0.15*Math.max(0,getP("estresse")-30)+efeito("neurogenese"),0.02),0,300),"motor");
+  
+  // Corpo
+  setP("massa_muscular",clamp(lerp(getP("massa_muscular"),100-0.3*Math.max(0,idade-40)+2*getP("atividade_fisica")-0.1*getP("il6"),0.01),40,130),"motor");
+  setP("densidade_ossea",clamp(lerp(getP("densidade_ossea"),100-0.2*Math.max(0,idade-40)+0.5*getP("atividade_fisica"),0.005),50,120),"motor");
+  setP("imunocompetencia",clamp(lerp(getP("imunocompetencia"),100-0.1*getP("il6")-0.05*getP("p16_sasp")+0.2*getP("atividade_fisica"),0.01),30,130),"motor");
+  
+  // Envelhecimento e risco de morte
+  setP("idade",idade+1/365.25,"motor");
+  setP("idade_biologica",getP("idade_biologica")+(1+0.01*(getP("p16_sasp")-5)+0.005*Math.max(0,getP("ros")-12))/365.25,"motor");
+  setP("risco_morte_ano",clamp(0.4*Math.exp(0.085*(getP("idade_biologica")-50))+1.5*getP("estagio"),0,100),"motor");
+  
+  if(!S.morto&&rand()<getP("risco_morte_ano")/100/365.25){
+    S.morto=true; setP("vivo",0,"trava");
+    addEvento("☠ ÓBITO aos "+getP("idade").toFixed(1)+" anos");
+  }
+}
+
+/* ---------- relógio e histórico ---------- */
+function snap(){ 
+  var v={}; 
+  for(var i=0;i<REG_ORDER.length;i++){ 
+    var id=REG_ORDER[i];
+    if(id.indexOf("drug_")===0) continue;
+    var x=S.params[id]; 
+    if(typeof x==="number") v[id]={avg:x,min:x,max:x}; 
+  } 
+  return {t:S.t,v:v}; 
+}
+
+function tick(){
+  if(S.morto) return;
+  stepFarmacos(); 
+  stepFast();
+  S.t++;
+  if(S.t%60===0){ 
+    stepMid(); 
+    S.histHora.push(snap()); 
+    if(S.histHora.length>2414) S.histHora.shift(); 
+  }
+  if(S.t%1440===0){ 
+    stepSlow(); 
+    S.histDia.push(snap()); 
+    if(S.histDia.length>900) S.histDia.shift(); 
+  }
+}
+
+function avancarMin(n){ 
+  if(!S||S.morto||EM_EXECUCAO) return;
+  var fim=S.t+n;
+  if(n<=20000){ 
+    while(S.t<fim&&!S.morto) tick(); 
+    renderTudo(); 
+    return; 
+  }
+  EM_EXECUCAO=true;
+  (function lote(){
+    var k=0; 
+    while(S.t<fim&&!S.morto&&k<20000){ tick(); k++; }
+    renderTudo();
+    if(S.t<fim&&!S.morto) setTimeout(lote,0); 
+    else EM_EXECUCAO=false;
+  })();
+}
+window.avancarMin=avancarMin;
+/* ================================================================
+CÓRTEX-70 v4 — PARTE 4/9: CATÁLOGO DE FÁRMACOS + FARMACOCINÉTICA
+50 drogas com ADME, EMax, EC50, Hill, interações, efeitos adversos.
+================================================================ */
+
+/* ---------- catálogo de fármacos ---------- */
+(function(){
+var D = [
+// id, nome, classe, via, F(biodisp), t12(h), Vd(L/kg), CL(L/h), EC50, Emax, Hill, intervaloH, doseMax, uniDose, efeitos_alvo
+["donepezila","Donepezila 5mg","inibidor_colinesterase","oral",0.45,70,12,0.08,0.3,0.85,1.2,24,10,"mg",{acetilcolina:0.6,memoria:0.3,humor:0.1}],
+["rivastigmina","Rivastigmina 6mg","inibidor_colinesterase","oral",0.35,1.5,0.1,0.5,0.4,0.75,1.1,12,12,"mg",{acetilcolina:0.5,memoria:0.25}],
+["galantamina","Galantamina 8mg","inibidor_colinesterase","oral",0.9,7,175,1.2,0.35,0.8,1.3,24,24,"mg",{acetilcolina:0.55,memoria:0.28}],
+["memantina","Memantina 10mg","antagonista_NMDA","oral",1.0,90,10,0.15,0.5,0.7,1.0,12,20,"mg",{glutamato:-0.3,executiva:0.2,neuronio_hipocampo:0.05}],
+["lecanemabe","Lecanemabe 10mg/kg","anti_amiloide_IV","IV",1.0,14,0.08,0.005,0.2,0.9,1.5,336,10,"mg/kg",{carga_amiloide:-0.8,depuracao_ab:0.4,ptau217:-0.2}],
+["donanemabe","Donanemabe 10mg/kg","anti_amiloide_IV","IV",1.0,16,0.09,0.006,0.22,0.88,1.4,672,10,"mg/kg",{carga_amiloide:-0.85,depuracao_ab:0.45,placa_amiloide:-0.6}],
+["aducanumabe","Aducanumabe 10mg/kg","anti_amiloide_IV","IV",1.0,14,0.07,0.005,0.18,0.75,1.3,672,10,"mg/kg",{carga_amiloide:-0.7,depuracao_ab:0.35}],
+["metformina","Metformina 850mg","antidiabetico","oral",0.6,6.2,1,0.5,0.5,0.6,1.0,12,2550,"mg",{homa_ir:-0.4,glicose:-0.3,ampk:0.5,autofagia:0.3}],
+["semaglutida","Semaglutida 1mg","agonista_GLP1","SC",0.92,168,12,0.05,0.3,0.75,1.1,168,2,"mg",{homa_ir:-0.5,glicose:-0.4,estresse:-0.2,pcr:-0.3}],
+["empagliflozina","Empagliflozina 10mg","inibidor_SGLT2","oral",0.8,12.4,1.7,0.1,0.4,0.5,0.9,24,25,"mg",{glicose:-0.2,pas:-0.15,tfg:0.1}],
+["losartana","Losartana 50mg","ARA_II","oral",0.33,2,34,0.8,0.5,0.65,1.0,24,100,"mg",{pas:-0.4,pad:-0.3,bhe_perm:-0.2}],
+["amlodipina","Anlodipina 5mg","bloqueador_canal_calcio","oral",0.8,45,21,0.3,0.5,0.6,1.0,24,10,"mg",{pas:-0.35,pad:-0.25}],
+["atorvastatina","Atorvastatina 20mg","estatina","oral",0.14,14,0.8,0.7,0.4,0.55,1.0,24,80,"mg",{ldl:-0.5,triglicerideos:-0.2,pcr:-0.25,il6:-0.15}],
+["rosuvastatina","Rosuvastatina 10mg","estatina","oral",0.2,19,0.7,0.5,0.35,0.6,1.1,24,40,"mg",{ldl:-0.55,triglicerideos:-0.25,pcr:-0.3}],
+["aspirina","Aspirina 100mg","antiagregante","oral",0.8,3,0.2,0.4,0.5,0.5,1.0,24,300,"mg",{plaquetas:-0.2,pcr:-0.15}],
+["clopidogrel","Clopidogrel 75mg","antiagregante","oral",0.5,6,0.05,0.2,0.45,0.55,1.0,24,75,"mg",{plaquetas:-0.25}],
+["omeprazol","Omeprazol 20mg","inibidor_bomba_protons","oral",0.35,1.5,0.3,0.3,0.6,0.7,1.0,24,40,"mg",{}],
+["sertralina","Sertralina 50mg","ISRS","oral",0.44,26,20,0.4,0.4,0.65,1.1,24,200,"mg",{serotonina:0.5,humor:0.4,estresse:-0.2}],
+["escitalopram","Escitalopram 10mg","ISRS","oral",0.8,30,12,0.3,0.35,0.7,1.2,24,20,"mg",{serotonina:0.55,humor:0.45,estresse:-0.25}],
+["duloxetina","Duloxetina 60mg","IRSN","oral",0.5,12,15,0.6,0.4,0.6,1.0,24,120,"mg",{serotonina:0.4,noradrenalina:0.3,humor:0.35}],
+["lorazepam","Lorazepam 1mg","benzodiazepinico","oral",0.9,12,1.3,0.1,0.6,0.8,1.3,8,4,"mg",{gaba:0.7,estresse:-0.4,acetilcolina:-0.15}],
+["zolpidem","Zolpidem 10mg","hipnotico_Z","oral",0.7,2.5,0.3,0.4,0.5,0.75,1.2,24,10,"mg",{gaba:0.6,sono_horas:0.3}],
+["melatonina","Melatonina 3mg","hormonio_sono","oral",0.15,1,0.4,0.8,0.4,0.5,1.0,24,10,"mg",{melatonina_n:0.6,sono_horas:0.2,cortisol:-0.1}],
+["levodopa","Levodopa 250mg","precursor_dopamina","oral",0.3,1.5,0.5,0.6,0.5,0.7,1.1,6,2000,"mg",{dopamina:0.6,neuronio_tronco:0.1}],
+["pramipexol","Pramipexol 0.5mg","agonista_dopamina","oral",0.9,12,5,0.3,0.4,0.65,1.0,8,1.5,"mg",{dopamina:0.5,neuronio_tronco:0.08}],
+["rasagilina","Rasagilina 1mg","IMAO_B","oral",0.4,3,1,0.5,0.35,0.55,1.0,24,2,"mg",{dopamina:0.4,neuronio_tronco:0.06}],
+["vitb12","Vitamina B12 1000µg","vitamina","oral",0.005,6,0.1,0.001,0.3,0.5,1.0,24,2000,"µg",{hb:0.3,neurogenese:0.2,humor:0.15}],
+["folato","Ácido fólico 5mg","vitamina","oral",0.9,0.6,0.2,0.3,0.35,0.45,1.0,24,10,"mg",{hb:0.25,homocisteina:-0.3}],
+["vitd3","Vitamina D3 2000UI","vitamina","oral",0.6,360,0.05,0.001,0.4,0.5,1.0,24,5000,"UI",{densidade_ossea:0.3,imunocompetencia:0.2,il6:-0.1}],
+["omega3","Ômega-3 1g","acido_graxo","oral",0.7,24,0.1,0.02,0.4,0.5,1.0,24,4,"g",{triglicerideos:-0.25,pcr:-0.2,il6:-0.15,memoria:0.1}],
+["creatina","Creatina 5g","suplemento","oral",0.9,3,0.5,0.1,0.3,0.4,1.0,24,10,"g",{massa_muscular:0.2,neurogenese:0.15,mito_potencial:0.1}],
+["nac","N-acetilcisteína 600mg","antioxidante","oral",0.1,5.6,0.3,0.3,0.45,0.6,1.0,12,1800,"mg",{glutationa:0.5,ros:-0.3,il6:-0.2}],
+["vitc","Vitamina C 500mg","antioxidante","oral",0.7,2,0.2,0.1,0.3,0.4,1.0,12,2000,"mg",{glutationa:0.2,ros:-0.15,imunocompetencia:0.1}],
+["vite","Vitamina E 400UI","antioxidante","oral",0.5,48,0.1,0.01,0.25,0.35,1.0,24,800,"UI",{ros:-0.2,ldl:-0.1}],
+["curcumina","Curcumina 500mg","antiinflamatorio","oral",0.01,6,0.5,0.2,0.35,0.45,1.0,24,2000,"mg",{il6:-0.25,pcr:-0.2,ros:-0.15}],
+["resveratrol","Resveratrol 250mg","sirt1_ativador","oral",0.02,1.5,0.3,0.4,0.3,0.4,1.0,24,1000,"mg",{sirt1:0.4,mito_potencial:0.2,ros:-0.1}],
+["nmn","NMN 500mg","precursor_NAD","oral",0.4,2,0.2,0.3,0.35,0.5,1.0,24,1000,"mg",{nad:0.5,sirt1:0.3,mito_potencial:0.25,autofagia:0.2}],
+["spermidina","Espermidina 2mg","autofagia","oral",0.6,4,0.1,0.05,0.3,0.45,1.0,24,10,"mg",{autofagia:0.4,limpeza_celular:0.3,p16_sasp:-0.15}],
+["urolitinoa","Urolitina A 500mg","mitofagia","oral",0.5,8,0.15,0.08,0.3,0.4,1.0,24,1000,"mg",{mito_potencial:0.3,mitofagia:0.4,ros:-0.15}],
+["fosfatidilserina","Fosfatidilserina 300mg","membrana","oral",0.3,12,0.2,0.05,0.3,0.35,1.0,24,600,"mg",{memoria:0.2,neuronio_hipocampo:0.05}],
+["alfagpc","Alfa-GPC 300mg","precursor_colina","oral",0.4,12,0.1,0.04,0.35,0.4,1.0,12,1200,"mg",{acetilcolina:0.4,memoria:0.25}],
+["tcog","TCG 1mg","nootropico","oral",0.6,6,0.3,0.1,0.3,0.35,1.0,24,3,"mg",{acetilcolina:0.3,memoria:0.2,executiva:0.15}],
+["whey","Whey protein 30g","proteina","oral",0.95,3,0.1,0.05,0.25,0.3,1.0,24,60,"g",{massa_muscular:0.3,albumina:0.2}],
+["zinco","Zinco 15mg","mineral","oral",0.3,4,0.2,0.05,0.3,0.35,1.0,24,50,"mg",{imunocompetencia:0.25,pele_score:0.1}],
+["magnesio","Magnésio 400mg","mineral","oral",0.4,5,0.3,0.08,0.3,0.4,1.0,24,800,"mg",{sono_horas:0.15,estresse:-0.1,fc:-0.05}],
+["calcio_sup","Cálcio 600mg","mineral","oral",0.3,6,0.2,0.06,0.25,0.3,1.0,24,1200,"mg",{densidade_ossea:0.35}],
+["vitk2","Vitamina K2 100µg","vitamina","oral",0.5,8,0.1,0.03,0.2,0.3,1.0,24,200,"µg",{densidade_ossea:0.25}],
+["uridina","Uridina 300mg","nucleosideo","oral",0.6,3,0.15,0.08,0.25,0.35,1.0,24,1000,"mg",{plasticidade_sinaptica:0.3,memoria:0.15}],
+["exercicio","Exercício 45min","estilo_vida","atividade",1.0,24,1,0.1,0.5,0.7,1.0,1440,120,"min",{bdnf:0.5,neurogenese:0.4,mito_potencial:0.3,homa_ir:-0.3,estresse:-0.25,il6:-0.2}],
+["jejum","Jejum 16h","estilo_vida","atividade",1.0,24,1,0.1,0.4,0.6,1.0,1440,20,"h",{autofagia:0.5,ampk:0.4,sirt1:0.3,homa_ir:-0.25,insulina:-0.3}]
+];
+
+for(var i=0;i<D.length;i++){
+  var d=D[i];
+  var def={id:d[0],nome:d[1],classe:d[2],via:d[3],F:d[4],t12:d[5],Vd:d[6],CL:d[7],EC50:d[8],Emax:d[9],Hill:d[10],
+    intervaloH:d[11],doseMax:d[12],uniDose:d[13],alvos:d[14]};
+  DRUG_DEFS.push(def);
+  DRUG_INDEX[def.id]=def;
+  
+  // Registra parâmetros do fármaco
+  P("drug_"+def.id+"_on","estado","farmacia",0,"0/1",{fis:[0,0],plaus:[0,1]});
+  P("drug_"+def.id+"_dose","estado","farmacia",def.doseMax*0.5,def.uniDose,{fis:[0,def.doseMax],plaus:[0,def.doseMax*2]});
+  P("drug_"+def.id+"_adesao","estado","farmacia",1,"0-1",{fis:[0.8,1],plaus:[0,1]});
+  P("drug_"+def.id+"_conc","estado","farmacia",0,"ng/mL",{fis:[0,1000],plaus:[0,10000]});
+}
+
+// Corrige alvos que não existem
+delete DRUG_INDEX.vitb12.alvos.hemograma; DRUG_INDEX.vitb12.alvos.hb=0.3;
+delete DRUG_INDEX.folato.alvos.hemograma; DRUG_INDEX.folato.alvos.hb=0.25;
+})();
+
+/* ---------- farmacocinética (ADME) ---------- */
+function stepFarmacos(){
+  if(!S.drugs) S.drugs=[];
+  S.fx={}; S.fxLento={};
+  
+  for(var i=0;i<DRUG_DEFS.length;i++){
+    var def=DRUG_INDEX[DRUG_DEFS[i].id];
+    var on=getP("drug_"+def.id+"_on");
+    if(on<0.5) continue;
+    
+    var dose=getP("drug_"+def.id+"_dose");
+    var adesao=getP("drug_"+def.id+"_adesao");
+    
+    // Busca ou cria instância
+    var inst=null;
+    for(var j=0;j<S.drugs.length;j++){
+      if(S.drugs[j].id===def.id){ inst=S.drugs[j]; break; }
+    }
+    if(!inst){
+      inst={id:def.id,A:0,C:0,proxDose:S.t};
+      S.drugs.push(inst);
+    }
+    
+    // Dose programada
+    if(S.t>=inst.proxDose){
+      if(rand()<adesao){
+        inst.A+=dose*def.F;
+      }
+      inst.proxDose=S.t+def.intervaloH*60;
+    }
+    
+    // Eliminação (meia-vida)
+    var ke=Math.LN2/def.t12; // constante de eliminação por hora
+    inst.A*=Math.exp(-ke/60); // por minuto
+    
+    // Concentração plasmática (ng/mL aproximado)
+    inst.C=inst.A/(def.Vd*70)*1000; // Vd em L/kg * 70kg, converte para ng/mL
+    
+    setP("drug_"+def.id+"_conc",inst.C,"motor");
+    
+    // Efeito (Emax model)
+    if(inst.C>0.01){
+      var E=def.Emax*Math.pow(inst.C,def.Hill)/(Math.pow(def.EC50,def.Hill)+Math.pow(inst.C,def.Hill));
+      
+      // Aplica efeitos nos alvos
+      for(var alvo in def.alvos){
+        var peso=def.alvos[alvo];
+        if(S.fx[alvo]===undefined) S.fx[alvo]=0;
+        S.fx[alvo]+=E*peso;
+      }
+      
+      // Efeitos lentos (acumulam ao longo do dia)
+      if(def.id==="lecanemabe"||def.id==="donanemabe"||def.id==="aducanumabe"){
+        if(S.fxLento["depuracao_ab"]===undefined) S.fxLento["depuracao_ab"]=0;
+        S.fxLento["depuracao_ab"]+=E*0.1/1440;
+      }
+    }
+  }
+}
+
+/* ---------- garantir fármacos ---------- */
+function garantirFarmacos(){
+  if(!S.drugs) S.drugs=[];
+  for(var i=0;i<DRUG_DEFS.length;i++){
+    var existe=false;
+    for(var j=0;j<S.drugs.length;j++){
+      if(S.drugs[j].id===DRUG_DEFS[i].id){ existe=true; break; }
+    }
+    if(!existe){
+      S.drugs.push({id:DRUG_DEFS[i].id,A:0,C:0,proxDose:S.t+60});
+    }
+  }
+}
+/* ================================================================
+CÓRTEX-70 v4 — PARTE 5/9: INTERFACE (N3)
+Cartões, monitor, gráfico (com seletor horas/dias), log, play/pause,
+autosave com botão "Continuar", export/import JSON.
+Todas as funções chamadas pelo HTML são globais (window.xxx = ...).
+================================================================ */
+
+/* ---------- lista de cartões (36 variáveis principais) ---------- */
+var CARTOES=[
+["mmse","MMSE",30],["cdr","CDR",3],["estagio","Estágio",5],
+["memoria","Memória",100],["executiva","Executiva",100],["linguagem","Linguagem",100],
+["carga_amiloide","Amiloide",150],["placa_amiloide","Placas",100],["ptau217","p-tau217",100],
+["neuronio_hipocampo","Neur. Hipoc.",100],["sinapse_hipocampo","Sin. Hipoc.",100],["saude_hipocampo","Saúde Hipoc.",100],
+["bdnf","BDNF",300],["neurogenese","Neurogênese",300],["saudavel_celular","Saúde celular",100],
+["mito_potencial","Mitocôndria",130],["ros","ROS",200],["autofagia","Autofagia",300],
+["il6","IL-6",200],["pcr","PCR",50],["bhe_perm","BHE perm.",100],
+["pas","PAS",260],["fc","FC",220],["spo2","SpO2",100],
+["glicose","Glicose",600],["homa_ir","HOMA-IR",20],["ldl","LDL",250],
+["sono_horas","Sono",14],["estresse","Estresse",100],["humor","Humor",100],
+["vigor_global","Vigor",100],["regeneracao_score","Regeneração",100],["idade_biologica","Idade biol.",130],
+["risco_morte_ano","Risco morte",100],["nfl","NfL",500],["gfap","GFAP",2000]
+];
+
+function atualizarCartoes(){
+  if(!S) return;
+  var h="";
+  for(var i=0;i<CARTOES.length;i++){
+    var id=CARTOES[i][0],nome=CARTOES[i][1];
+    var v=getP(id);
+    var st=statusDe(id,v);
+    var cls=st==="ok"?"ok":(st==="bad"?"bad":"warn");
+    h+='<div class="cartao '+cls+'"><small>'+nome+'</small><b>'+fmt(v)+'</b></div>';
+  }
+  document.getElementById("cartoes").innerHTML=h;
+}
+
+function atualizarMonitor(){
+  if(!S) return;
+  var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;font-size:12px">';
+  var vars=["pas","pad","pam","fc","fr","temp","spo2","glicose","homa_ir","ph","pco2","cbf"];
+  for(var i=0;i<vars.length;i++){
+    var id=vars[i];
+    var r=REG[id];
+    if(!r) continue;
+    h+='<div><span style="color:var(--tx2)">'+id+':</span> <b>'+fmt(getP(id))+'</b> '+esc(r.unidade)+'</div>';
+  }
+  h+='</div>';
+  document.getElementById("monitor-conteudo").innerHTML=h;
+}
+
+function atualizarTempo(){
+  if(!S) return;
+  var txt="t="+fmtT(S.t);
+  if(S.morto) txt+=" ☠ ÓBITO";
+  document.getElementById("tempo").textContent=txt;
+}
+
+function atualizarLog(){
+  if(!S) return;
+  var h="";
+  var ini=Math.max(0,S.log.length-50);
+  for(var i=S.log.length-1;i>=ini;i--){
+    var l=S.log[i];
+    h+='<div>['+fmtT(l.t)+'] <b>'+esc(l.tipo)+':</b> '+esc(l.txt)+'</div>';
+  }
+  document.getElementById("log-conteudo").innerHTML=h;
+}
+
+/* ---------- gráfico com seletor de escala (horas/dias) ---------- */
+var grafVar="mmse";
+var grafEscala="hora";
+
+function preencherGrafVars(){
+  var sel=document.getElementById("graf-var");
+  var h="";
+  for(var i=0;i<REG_ORDER.length;i++){
+    var id=REG_ORDER[i];
+    if(id.indexOf("drug_")===0) continue;
+    h+='<option value="'+id+'"'+(id===grafVar?' selected':'')+'>'+id+'</option>';
+  }
+  sel.innerHTML=h;
+}
+
+function desenharGrafico(){
+  var selEsc=document.getElementById("graf-escala");
+  var selVar=document.getElementById("graf-var");
+  if(selEsc) grafEscala=selEsc.value;
+  if(selVar) grafVar=selVar.value;
+  
+  var canvas=document.getElementById("graf-canvas");
+  if(!canvas) return;
+  var ctx=canvas.getContext("2d");
+  canvas.width=canvas.offsetWidth||800;
+  canvas.height=200;
+  ctx.fillStyle="#1a1f2e";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  
+  if(!S) return;
+  
+  var dados=(grafEscala==="dia")?S.histDia:S.histHora;
+  if(!dados||!dados.length) return;
+  
+  var limite=(grafEscala==="dia")?365:100;
+  dados=dados.slice(-limite);
+  
+  var vals=[];
+  for(var i=0;i<dados.length;i++){
+    var v=dados[i].v&&dados[i].v[grafVar];
+    if(v&&typeof v.avg==="number") vals.push({t:dados[i].t,val:v.avg});
+  }
+  if(vals.length<2) return;
+  
+  var min=Infinity,max=-Infinity;
+  for(var i=0;i<vals.length;i++){
+    if(vals[i].val<min) min=vals[i].val;
+    if(vals[i].val>max) max=vals[i].val;
+  }
+  
+  var r=REG[grafVar];
+  if(r&&r.faixa_fisio){
+    if(r.faixa_fisio[0]<min) min=r.faixa_fisio[0];
+    if(r.faixa_fisio[1]>max) max=r.faixa_fisio[1];
+  }
+  
+  var range=max-min||1;
+  var dx=canvas.width/(vals.length-1);
+  
+  // Faixa fisiológica (fundo verde)
+  if(r&&r.faixa_fisio){
+    ctx.fillStyle="rgba(52,211,153,0.12)";
+    var y1=canvas.height-(r.faixa_fisio[0]-min)/range*canvas.height;
+    var y2=canvas.height-(r.faixa_fisio[1]-min)/range*canvas.height;
+    ctx.fillRect(0,y2,canvas.width,y1-y2);
+  }
+  
+  // Linha do valor
+  ctx.strokeStyle="#4a9eff";
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  for(var i=0;i<vals.length;i++){
+    var x=i*dx;
+    var y=canvas.height-(vals[i].val-min)/range*canvas.height;
+    if(i===0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  
+  // Rótulos
+  ctx.fillStyle="#9aa0a6";
+  ctx.font="11px monospace";
+  ctx.fillText("max: "+fmt(max),6,14);
+  ctx.fillText("min: "+fmt(min),6,canvas.height-6);
+  ctx.fillText(grafVar+" ("+grafEscala+")",canvas.width-150,14);
+}
+
+/* ---------- play/pause ---------- */
+var JOGANDO=false;
+var timer=null;
+function togglePlay(){
+  if(!S||S.morto) return;
+  JOGANDO=!JOGANDO;
+  var btn=document.getElementById("btn-play");
+  if(btn) btn.textContent=JOGANDO?"⏸ Pause":"▶ Play";
+  if(JOGANDO){
+    timer=setInterval(function(){
+      avancarMin(60);
+      renderTudo();
+    },100);
+  }else{
+    if(timer){ clearInterval(timer); timer=null; }
+  }
+}
+window.togglePlay=togglePlay;
+
+/* ---------- renderiza tudo ---------- */
+function renderTudo(){
+  atualizarCartoes();
+  atualizarMonitor();
+  atualizarTempo();
+  atualizarLog();
+  desenharGrafico();
+}
+window.renderTudo=renderTudo;
+
+/* ---------- export/import JSON ---------- */
+function exportarJSON(){
+  if(!S) return;
+  var dados={
+    schema_version:SCHEMA_VERSION,
+    motor_version:MOTOR_VERSION,
+    seed:S.seed, t:S.t, cfg:S.cfg,
+    params:S.params, log:S.log, events:S.events,
+    histHora:S.histHora, histDia:S.histDia,
+    drugs:S.drugs, morto:S.morto,
+    rng:S.rng.s, perfilExtra:S.perfilExtra||null
+  };
+  var blob=new Blob([JSON.stringify(dados,null,2)],{type:"application/json"});
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="cortex70_"+(S.cfg.nome||"paciente")+"_t"+S.t+".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); },2000);
+  addLog("fx","💾 Save exportado");
+}
+window.exportarJSON=exportarJSON;
+
+function importarJSON(inp){
+  var f=inp.files&&inp.files[0]; if(!f) return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    try{
+      var d=JSON.parse(rd.result);
+      if(!d.params) throw new Error("sem params");
+      S={
+        schema_version:d.schema_version||SCHEMA_VERSION,
+        motor_version:d.motor_version||MOTOR_VERSION,
+        t:d.t||0, seed:d.seed||1,
+        rng:{s:d.rng||(d.seed||1)},
+        cfg:d.cfg||{}, params:d.params||{},
+        log:d.log||[], events:d.events||[],
+        fx:{}, fxLento:{},
+        histHora:d.histHora||[], histDia:d.histDia||[],
+        histMin:[], ultHora:-1, ultDia:-1,
+        morto:!!d.morto, contHora:0,
+        drugs:d.drugs||[], perfilExtra:d.perfilExtra||null
+      };
+      if(!S.drugs.length) for(var i=0;i<DRUG_DEFS.length;i++) S.drugs.push({id:DRUG_DEFS[i].id,A:0,C:0,proxDose:S.t+60});
+      document.getElementById("criacao").style.display="none";
+      document.getElementById("app").style.display="flex";
+      addLog("fx","📂 Save importado (t="+fmtT(S.t)+")");
+      renderTudo();
+    }catch(e){ alert("Arquivo inválido: "+e.message); }
+    inp.value="";
+  };
+  rd.readAsText(f);
+}
+window.importarJSON=importarJSON;
+
+/* ---------- autosave + botão Continuar ---------- */
+setInterval(function(){
+  if(!S||S.morto) return;
+  try{
+    var c={
+      schema_version:SCHEMA_VERSION, motor_version:MOTOR_VERSION,
+      seed:S.seed, t:S.t, cfg:S.cfg, params:S.params,
+      log:S.log.slice(-100), events:S.events.slice(-50),
+      histHora:S.histHora.slice(-100), histDia:S.histDia.slice(-60),
+      drugs:S.drugs, morto:S.morto, rng:S.rng.s, perfilExtra:S.perfilExtra||null
+    };
+    localStorage.setItem("cortex70_autosave",JSON.stringify(c));
+  }catch(e){}
+},60000);
+
+(function(){
+  try{
+    var sv=localStorage.getItem("cortex70_autosave");
+    if(sv){
+      var box=document.getElementById("continuar-box");
+      if(box){
+        var b=document.createElement("button");
+        b.textContent="↩ Continuar último autosave";
+        b.style.cssText="margin-top:10px;width:100%;padding:10px;background:var(--acc2);border:none;border-radius:6px;color:#fff;font-size:14px;cursor:pointer";
+        b.onclick=function(){
+          try{
+            var d=JSON.parse(sv);
+            S={
+              schema_version:d.schema_version||SCHEMA_VERSION,
+              motor_version:d.motor_version||MOTOR_VERSION,
+              t:d.t||0, seed:d.seed||1,
+              rng:{s:d.rng||(d.seed||1)},
+              cfg:d.cfg||{}, params:d.params||{},
+              log:d.log||[], events:d.events||[],
+              fx:{}, fxLento:{},
+              histHora:d.histHora||[], histDia:d.histDia||[],
+              histMin:[], ultHora:-1, ultDia:-1,
+              morto:!!d.morto, contHora:0,
+              drugs:d.drugs||[], perfilExtra:d.perfilExtra||null
+            };
+            if(!S.drugs.length) for(var i=0;i<DRUG_DEFS.length;i++) S.drugs.push({id:DRUG_DEFS[i].id,A:0,C:0,proxDose:S.t+60});
+            document.getElementById("criacao").style.display="none";
+            document.getElementById("app").style.display="flex";
+            addLog("fx","↩ Autosave restaurado (t="+fmtT(S.t)+")");
+            renderTudo();
+          }catch(e){ alert("Autosave inválido."); }
+        };
+        box.appendChild(b);
+      }
+    }
+  }catch(e){}
+})();
+
+/* ---------- inicialização do gráfico ---------- */
+preencherGrafVars();
+/* ================================================================
+CÓRTEX-70 v4 — PARTE 6/9: BLOCO 3
+SONO ARQUITETADO • HORMÔNIOS • INTESTINO-CÉREBRO
+TAU EM GRAFO (8 REGIÕES) • BRAAK • AT(N) • HOTFIX DE EFEITOS
+================================================================ */
+
+/* ---------- 1. PARÂMETROS NOVOS ---------- */
+P("cortisol","estado","hormonios",12,"µg/dL",{fis:[5,25],plaus:[0,80]});
+P("cortisol_cronico","estado","hormonios",12,"µg/dL",{fis:[5,20],plaus:[0,80]});
+P("melatonina_n","estado","hormonios",5,"pg/mL",{fis:[1,80],plaus:[0,200]});
+P("tsh","estado","hormonios",2.0,"mUI/L",{fis:[0.4,4.5],plaus:[0.01,100]});
+P("t4l","estado","hormonios",1.2,"ng/dL",{fis:[0.8,1.8],plaus:[0.2,5]});
+P("sexo_horm","estado","hormonios",100,"%",{fis:[30,110],plaus:[0,150]});
+P("sono_n3_min","estado","sono",70,"min/noite",{fis:[20,120],plaus:[0,200]});
+P("sono_rem_min","estado","sono",90,"min/noite",{fis:[40,140],plaus:[0,250]});
+P("sono_eficiencia","estado","sono",90,"%",{fis:[75,100],plaus:[0,100]});
+P("diversidade_microbioma","estado","intestino",70,"%",{fis:[40,100],plaus:[5,100]});
+P("scfa","estado","intestino",60,"%",{fis:[35,100],plaus:[5,120]});
+P("permeab_intestinal","estado","intestino",10,"%",{fis:[0,25],plaus:[0,100]});
+
+/* amiloide regional + tau já existe no N1 */
+(function(){
+for(var i=0;i<REGIOES.length;i++){ var r=REGIOES[i];
+  P("abeta_"+r,"estado","amiloide_regional",0,"carga",{escopo:"regiao:"+r,fis:[0,15],plaus:[0,100]});
+}
+})();
+
+P("braak_estagio","estado","exames",0,"0-6",{fis:[0,2],plaus:[0,6]});
+P("atn_a","estado","exames",0,"0/1",{fis:[0,0],plaus:[0,1]});
+P("atn_t","estado","exames",0,"0/1",{fis:[0,0],plaus:[0,1]});
+P("atn_n","estado","exames",0,"0/1",{fis:[0,0],plaus:[0,1]});
+
+/* ---------- 2. HOTFIX: efeitos que apontavam para o nome do fármaco ---------- */
+var EFEITO_ALIAS = {
+  calcio_sup:"densidade_ossea", vitk2:"densidade_ossea", whey:"massa_muscular",
+  zinco:"imunocompetencia", uridina:"plasticidade_sinaptica", urolitinoa:"mito_potencial",
+  mitofagia:"mito_potencial", homocisteina:"homa_ir"
+};
+var _efeito_v1 = efeito;
+efeito = function(p){ return _efeito_v1(EFEITO_ALIAS[p] || p); };
+
+/* ---------- 3. SONO ARQUITETADO (roda a cada minuto, sem sorteio) ---------- */
+function sonoArquitetado(){
+  var tod = S.t % 1440, m = (tod - 1380 + 1440) % 1440;   /* min desde 23:00 */
+  var qual = S.cfg.sono==="ruim" ? 0.6 : (S.cfg.sono==="regular" ? 0.85 : 1);
+  var fase = 0;
+  if(m < 450){
+    var k = Math.floor(m/90), p = m % 90;
+    var remLen = Math.min(30, 8 + 7*k);
+    var n3Len = Math.max(0, Math.round((40 - 10*k) * qual
+      * (getP("apneia_iah")>15 ? 0.6 : 1) * (getP("cortisol_cronico")>18 ? 0.8 : 1)));
+    if(p < 5) fase = 1;
+    else if(p >= 90 - remLen) fase = 4;
+    else if(p >= 20 && p < 20 + n3Len) fase = 3;
+    else fase = 2;
+    if(m > 10 && ((Math.imul(S.t, 2654435761)>>>0) % 1000) < 30*(1-qual)) fase = 0;
+    S.sonoMin = (S.sonoMin||0) + (fase>0?1:0);
+    if(fase===3) S.n3min = (S.n3min||0) + 1;
+    if(fase===4) S.remmin = (S.remmin||0) + 1;
+  }
+  if(tod === 420 && S.sonoMin){
+    setP("sono_n3_min", S.n3min||0, "motor");
+    setP("sono_rem_min", S.remmin||0, "motor");
+    setP("sono_eficiencia", 100*S.sonoMin/450, "motor");
+    S.sonoMin = 0; S.n3min = 0; S.remmin = 0;
+  }
+  setP("sono_fase", fase, "motor");
+}
+var _stepFast_v3 = stepFast;
+stepFast = function(){ sonoArquitetado(); _stepFast_v3(); };
+
+/* ---------- 4. MÉDIO (por hora): hormônios + intestino-cérebro ---------- */
+function stepMidV3(){
+  var h = (S.t/60) % 24, idade = idadeBiologicaReal(), est = getP("estresse");
+  
+  setP("cortisol", clamp(10 + 7*Math.cos(2*Math.PI*(h-8)/24) + 0.12*est + 0.8*rngG(), 2, 80), "motor");
+  setP("cortisol_cronico", lerp(getP("cortisol_cronico"), getP("cortisol"), 1/168), "motor");
+  var noite = (h>=21 || h<7) ? 1 : 0;
+  setP("melatonina_n", clamp(3 + 50*noite*(1 - 0.008*Math.max(0,idade-30)) - 0.5*getP("cortisol"), 1, 200), "motor");
+  setP("tsh", lerp(getP("tsh"), 1.8 + 0.02*Math.max(0,idade-50), 0.01), "motor");
+  setP("t4l", clamp(1.3 - 0.1*(getP("tsh")-2)/2, 0.2, 5), "motor");
+  var hormAlvo = S.cfg.sexo==="F" ? 100 - 1.5*Math.max(0,idade-50) : 100 - 0.6*Math.max(0,idade-40);
+  setP("sexo_horm", clamp(lerp(getP("sexo_horm"), hormAlvo, 0.001), 25, 110), "motor");
+  
+  /* intestino-cérebro */
+  var divAlvo = clamp(45 + 20*getP("dieta_score") + 6*getP("atividade_fisica") - 0.3*Math.max(0,idade-60), 10, 100);
+  setP("diversidade_microbioma", lerp(getP("diversidade_microbioma"), divAlvo, 0.005), "motor");
+  setP("scfa", clamp(lerp(getP("scfa"), 0.85*getP("diversidade_microbioma"), 0.01), 5, 120), "motor");
+  var permAlvo = clamp(35 - 0.3*getP("diversidade_microbioma") - 0.1*getP("scfa") + 0.15*est, 2, 60);
+  setP("permeab_intestinal", lerp(getP("permeab_intestinal"), permAlvo, 0.01), "motor");
+  
+  /* ajustes sobre o que o motor acabou de calcular nesta hora */
+  setP("il6", clamp(getP("il6") - 0.4*(getP("scfa")-60)/40 + 0.02*(getP("permeab_intestinal")-10), 0, 500), "motor");
+  setP("bhe_perm", clamp(getP("bhe_perm") + 0.002*(getP("scfa")-60)/40, 5, 110), "motor");
+  
+  /* consumidor: efeito de metformina/semaglutida/exercício/jejum no HOMA-IR */
+  setP("homa_ir", clamp(getP("homa_ir") + efeito("homa_ir"), 0.2, 20), "motor");
+}
+var _stepMid_v3 = stepMid;
+stepMid = function(){ _stepMid_v3(); stepMidV3(); };
+
+/* ---------- 5. LENTO (por dia): tau em grafo + Braak + AT(N) ---------- */
+var TAU_ARESTAS = [
+  ["hipocampo","temporal",0.9],["temporal","parietal",0.6],["temporal","frontal",0.5],
+  ["parietal","frontal",0.5],["parietal","occipital",0.45],["frontal","occipital",0.15],
+  ["frontal","talamus",0.25],["temporal","talamus",0.2],["occipital","cerebelo",0.05],["talamus","tronco",0.05]
+];
+var AB_PESO = {frontal:1.1,parietal:1.1,temporal:1.0,occipital:0.7,hipocampo:0.6,talamus:0.4,cerebelo:0.2,tronco:0.2};
+var TAU_SEMENTE = {hipocampo:1.0,temporal:0.6};
+
+function initTau(){
+  var soma = 0; for(var i=0;i<REGIOES.length;i++) soma += getP("tau_"+REGIOES[i]);
+  if(soma > 0) return;
+  var base = Math.max(0, (getP("ptau217") - 0.8) * 12);
+  if(base <= 0) return;
+  setP("tau_hipocampo", base, "motor");
+  setP("tau_temporal", base*0.6, "motor");
+  setP("tau_parietal", base*0.25, "motor");
+  setP("tau_frontal", base*0.25, "motor");
+}
+
+function stepTauGrafo(){
+  initTau();
+  var carga = getP("carga_amiloide"), placa = getP("placa_amiloide");
+  var acel = 1 + placa/25 + Math.max(0, getP("microglia_m1")-30)/60;
+  var dep = 0.004 * (getP("limpeza_celular")/100) * (1 + 0.5*getP("bdnf")/100);
+  var sem = 0.03 * Math.max(0, carga-12)/10 * getP("apoe_risco") * getP("carga_genetica");
+  var d = {}, i, r;
+  for(i=0;i<REGIOES.length;i++){ r = REGIOES[i]; var t = getP("tau_"+r);
+    d[r] = (TAU_SEMENTE[r]||0)*sem + 0.004*acel*t*(1 - t/100) - dep*t;
+    setP("abeta_"+r, clamp(placa*AB_PESO[r], 0, 100), "motor");
+  }
+  for(i=0;i<TAU_ARESTAS.length;i++){
+    var a = TAU_ARESTAS[i][0], b = TAU_ARESTAS[i][1], w = TAU_ARESTAS[i][2];
+    var ta = getP("tau_"+a), tb = getP("tau_"+b);
+    if(ta > tb) d[b] += 0.03*w*acel*(ta-tb);
+    else if(tb > ta) d[a] += 0.03*w*acel*(tb-ta);
+  }
+  var reserva = getP("reserva_cognitiva"), soma = 0;
+  for(i=0;i<REGIOES.length;i++){ r = REGIOES[i];
+    var tn = clamp(getP("tau_"+r) + d[r], 0, 100);
+    setP("tau_"+r, tn, "motor");
+    soma += tn;
+  }
+  setP("ptau217", clamp(Math.max(getP("ptau217"), 0.8 + 0.05*soma/REGIOES.length), 0, 100), "motor");
+}
+
+function classificarDiagnostico(){
+  var hip = getP("tau_hipocampo"), tem = getP("tau_temporal"), fro = getP("tau_frontal"),
+      par = getP("tau_parietal"), occ = getP("tau_occipital"), braak = 0;
+  if(hip >= 5) braak = 2;
+  if(tem >= 8) braak = 4;
+  if(fro >= 8 || par >= 8) braak = 5;
+  if(occ >= 8) braak = 6;
+  if(braak !== getP("braak_estagio")){
+    if(braak > getP("braak_estagio")) addEvento("🧩 Tau atinge estágio de Braak "+braak);
+    setP("braak_estagio", braak, "motor");
+  }
+  var A = getP("carga_amiloide") >= 18 ? 1 : 0;
+  var T = getP("ptau217") >= 1.5 ? 1 : 0;
+  var N = (getP("nfl") > 25 || getP("rm_vol_hipocampo") < 85) ? 1 : 0;
+  var antes = "A"+getP("atn_a")+"T"+getP("atn_t")+"N"+getP("atn_n");
+  setP("atn_a", A, "motor");
+  setP("atn_t", T, "motor");
+  setP("atn_n", N, "motor");
+  var depois = "A"+A+"T"+T+"N"+N;
+  if(antes !== depois) addEvento("🔬 AT(N): "+(A?"A+":"A−")+(T?"T+":"T−")+(N?"N+":"N−"));
+}
+
+function stepSlowV3(){
+  stepTauGrafo();
+  classificarDiagnostico();
+}
+var _stepSlow_v3 = stepSlow;
+stepSlow = function(){ _stepSlow_v3(); stepSlowV3(); };
+/* ================================================================
+CÓRTEX-70 v4 — PARTE 7/9: BLOCO 5+6 — PAINÉIS NA TELA
+💊 Painel de fármacos/nutrientes/terapias  |  ⚙ Editor de parâmetros
+Cria os botões no topo automaticamente.
+================================================================ */
+(function(){
+var css = "#c70-ov{position:fixed;inset:0;z-index:90;background:var(--bg);overflow-y:auto;padding-bottom:60px}"
++"#c70-top{position:sticky;top:0;z-index:2;background:var(--bg2);border-bottom:1px solid var(--borda);padding:8px 10px}"
++"#c70-top .lin{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px}"
++"#c70-q{width:100%}"
++".c70r{background:var(--card);border:1px solid var(--borda);border-radius:10px;margin:8px 10px;padding:8px 10px}"
++".c70h small{color:var(--tx3);display:block;font-size:11px}"
++".c70c{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:12px;color:var(--tx2)}"
++".c70c input[type=number]{width:84px;padding:6px}"
++".c70g{margin:12px 10px 0;color:var(--acc2);font-size:12px;text-transform:uppercase;letter-spacing:1px}"
++".c70on{border-color:var(--ok)} .c70b{min-height:34px;padding:5px 9px;font-size:12px}";
+var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+var ov = document.createElement("div"); ov.id = "c70-ov"; ov.style.display = "none"; document.body.appendChild(ov);
+var ABA = null, Q = "";
+var topo = document.getElementById("topo");
+function botao(txt, fn){ var b = document.createElement("button"); b.textContent = txt; b.onclick = fn; topo.appendChild(b); }
+botao("💊 Fármacos", function(){ abrir("f"); });
+botao("⚙ Parâmetros", function(){ abrir("p"); });
+function abrir(aba){ if(!S) return; ABA = aba; Q = ""; ov.style.display = "block"; montar(); }
+window.c70Fechar = function(){ ov.style.display = "none"; ABA = null; };
+function esc2(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+function fmt2(v){ return Math.abs(v)>=100 ? v.toFixed(0) : (Math.abs(v)>=10 ? v.toFixed(1) : v.toFixed(2)); }
+function montar(){
+var h = "<div id='c70-top'><div class='lin'><b>"+(ABA==="f"?"💊 Fármacos e terapias":"⚙ Editor de parâmetros")+"</b><span style='flex:1'></span>";
+h += "<button class='c70b' onclick=\"c70Aba('"+(ABA==="f"?"p":"f")+"')\">"+(ABA==="f"?"⚙ Parâmetros":"💊 Fármacos")+"</button>";
+h += "<button class='c70b prim' onclick='c70Fechar()'>✕ Fechar</button></div>";
+if(ABA==="p") h += "<div class='lin'><label style='font-size:12px'><input type='checkbox' onchange='c70Deus(this.checked)'> Modo Deus (ignora limites)</label></div>";
+else h += "<div class='lin'>"+presetsHtml()+"</div>";
+h += "<input type='text' id='c70-q' placeholder='Buscar...' oninput='c70Busca(this.value)'></div><div id='c70-lista'></div>";
+ov.innerHTML = h; lista();
+}
+window.c70Aba = function(a){ ABA = a; Q = ""; montar(); };
+window.c70Busca = function(v){ Q = v.toLowerCase(); lista(); };
+function lista(){ document.getElementById("c70-lista").innerHTML = (ABA==="f") ? listaF() : listaP(); }
+/* ---------- FÁRMACOS ---------- */
+function inst(id){
+for(var i=0;i<S.drugs.length;i++) if(S.drugs[i].id===id) return S.drugs[i];
+var n = {id:id,A:0,C:0,proxDose:S.t}; S.drugs.push(n); return n;
+}
+function listaF(){
+var d = DRUG_DEFS.slice().sort(function(a,b){ return (a.classe+a.nome).localeCompare(b.classe+b.nome); });
+var h = "", cl = "";
+for(var i=0;i<d.length;i++){ var f = d[i];
+if(Q && (f.nome+" "+f.classe+" "+f.id).toLowerCase().indexOf(Q)<0) continue;
+if(f.classe!==cl){ cl = f.classe; h += "<div class='c70g'>"+esc2(cl)+"</div>"; }
+var on = getP("drug_"+f.id+"_on")>0.5, un = f.uniDose||"mg";
+h += "<div class='c70r"+(on?" c70on":"")+"'><div class='c70h'><b>"+esc2(f.nome)+"</b><small>"+esc2(f.via)+" · a cada "+f.intervaloH+" h · máx. "+f.doseMax+" "+un+"</small></div><div class='c70c'>"
++"<label><input type='checkbox' "+(on?"checked":"")+" onchange=\"c70Drug('"+f.id+"',this.checked)\"> ativo</label>"
++" dose <input type='number' step='any' value='"+getP("drug_"+f.id+"_dose")+"' onchange=\"c70Dose('"+f.id+"',this.value)\"> "+un
++" adesão <input type='number' min='0' max='1' step='0.05' value='"+getP("drug_"+f.id+"_adesao")+"' onchange=\"c70Adesao('"+f.id+"',this.value)\">"
++"<button class='c70b' onclick=\"c70Bolus('"+f.id+"')\">Dose agora</button>"
++"<span>conc.: <b data-conc='"+f.id+"'>"+fmt2(getP("drug_"+f.id+"_conc"))+"</b></span></div></div>";
+}
+return h || "<div class='c70g'>Nada encontrado</div>";
+}
+window.c70Drug = function(id,on){
+setP("drug_"+id+"_on", on?1:0, "trava");
+if(on) inst(id).proxDose = S.t;
+addLog("fx",(on?"▶ Iniciado: ":"■ Suspenso: ")+DRUG_INDEX[id].nome); renderTudo(); lista();
+};
+window.c70Dose = function(id,v){ v = parseFloat(v); if(isNaN(v)||v<0) return; setP("drug_"+id+"_dose", v, "trava"); };
+window.c70Adesao = function(id,v){ v = parseFloat(v); if(isNaN(v)) return; setP("drug_"+id+"_adesao", clamp(v,0,1), "trava"); };
+window.c70Bolus = function(id){
+var def = DRUG_INDEX[id], dose = getP("drug_"+id+"_dose");
+inst(id).A += dose*def.F; addLog("fx","💉 Dose avulsa: "+def.nome+" "+dose+" "+(def.uniDose||"mg"));
+if(getP("drug_"+id+"_on")<0.5) addLog("fx","(ative o fármaco para o efeito atuar)");
+renderTudo();
+};
+var PRESETS = [
+{n:"Suspender tudo", i:null},
+{n:"Anti-Alzheimer combinado (hipótese)", i:[["donepezila",5],["memantina",10],["lecanemabe",10],["exercicio",45],["jejum",1],["vitb12",1000],["omega3",1000],["nmn",500],["spermidina",2]]},
+{n:"Vascular/metabólico", i:[["metformina",850],["atorvastatina",20],["losartana",50],["aspirina",100],["exercicio",30]]},
+{n:"Regeneração e nutrição", i:[["nac",600],["creatina",5],["whey",30],["vitc",500],["vitk2",100],["fosfatidilserina",300],["tcog",1]]}
+];
+function presetsHtml(){
+var h = "";
+for(var i=0;i<PRESETS.length;i++) h += "<button class='c70b' onclick='c70Preset("+i+")'>"+esc2(PRESETS[i].n)+"</button>";
+return h + "<small style='color:var(--tx3);width:100%'>Presets são cenários didáticos, não recomendações.</small>";
+}
+window.c70Preset = function(i){
+var p = PRESETS[i], k;
+if(!p.i){ for(k=0;k<DRUG_DEFS.length;k++) setP("drug_"+DRUG_DEFS[k].id+"_on", 0, "trava"); addLog("fx","■ Todos os tratamentos suspensos"); }
+else { for(k=0;k<p.i.length;k++){ var id = p.i[k][0]; if(!DRUG_INDEX[id]) continue;
+setP("drug_"+id+"_dose", p.i[k][1], "trava"); setP("drug_"+id+"_on", 1, "trava"); inst(id).proxDose = S.t; }
+addLog("fx","▶ Preset aplicado: "+p.n); }
+renderTudo(); lista();
+};
+/* ---------- PARÂMETROS ---------- */
+function listaP(){
+var ids = REG_ORDER.filter(function(id){
+if(id.indexOf("drug_")===0) return false;
+var r = REG[id]; return !Q || (id+" "+r.grupo+" "+r.unidade).toLowerCase().indexOf(Q)>=0;
+});
+ids.sort(function(a,b){ return (REG[b].favorito?1:0)-(REG[a].favorito?1:0); });
+var tot = ids.length, h = "";
+ids = ids.slice(0,80);
+for(var i=0;i<ids.length;i++){ var id = ids[i], r = REG[id], fs = r.faixa_fisio;
+var tr = r.travado==="freeze" ? "❄ congelado" : (r.travado==="clamp" ? "📌 fixo" : "livre");
+h += "<div class='c70r'><div class='c70h'><b>"+id+"</b><small>"+esc2(r.grupo)+" · "+esc2(r.unidade)
++(fs?" · normal "+fs[0]+"–"+fs[1]:"")+"</small></div><div class='c70c'>"
++"<input type='number' step='any' data-pid='"+id+"' value='"+getP(id)+"' onchange=\"c70Set('"+id+"',this.value)\">"
++"<button class='c70b' onclick=\"c70Trava('"+id+"')\">"+tr+"</button>"
++"<button class='c70b' onclick=\"c70Fav('"+id+"')\">"+(r.favorito?"★":"☆")+"</button>"
++"<button class='c70b' onclick=\"c70Reset('"+id+"')\">↺ basal</button></div></div>";
+}
+if(tot>80) h += "<div class='c70g'>Mostrando 80 de "+tot+" — refine a busca</div>";
+return h || "<div class='c70g'>Nada encontrado</div>";
+}
+window.c70Set = function(id,v){
+v = parseFloat(v); if(isNaN(v)) return; var r = REG[id];
+if(r.travado==="clamp") r.valor = v;
+setP(id, v, "trava"); addLog("fx","✎ "+id+" = "+v); renderTudo();
+};
+window.c70Trava = function(id){
+var r = REG[id];
+if(!r.travado){ r.travado = "freeze"; }
+else if(r.travado==="freeze"){ r.travado = "clamp"; r.valor = getP(id); }
+else { r.travado = null; }
+lista();
+};
+window.c70Fav = function(id){ REG[id].favorito = !REG[id].favorito; lista(); };
+window.c70Reset = function(id){ var r = REG[id]; if(r.travado==="clamp") r.valor = r.basal; setP(id, r.basal, "trava"); renderTudo(); lista(); };
+window.c70Deus = function(on){ for(var i=0;i<REG_ORDER.length;i++) REG[REG_ORDER[i]].modo = on ? "deus" : "real"; addLog("fx", on?"⚡ Modo Deus ligado":"Modo Deus desligado"); };
+/* ---------- atualização ao vivo (sem tirar o foco dos campos) ---------- */
+var _renderTudo_v5 = renderTudo;
+renderTudo = function(){
+_renderTudo_v5();
+if(!ABA || ov.style.display==="none") return;
+var a = ov.querySelectorAll("[data-conc]"), i;
+for(i=0;i<a.length;i++) a[i].textContent = fmt2(getP("drug_"+a[i].getAttribute("data-conc")+"_conc"));
+var p = ov.querySelectorAll("input[data-pid]");
+for(i=0;i<p.length;i++) if(p[i]!==document.activeElement) p[i].value = getP(p[i].getAttribute("data-pid"));
+};
+})();
+/* ================================================================
+CÓRTEX-70 v4 — PARTE 8/9: BLOCO 4 — CÉREBRO SVG + BIOMARCADORES
+Cérebro com 8 regiões (5 modos de cor), chips AT(N)/Braak, barras mestras.
+================================================================ */
+(function(){
+var css = "#c70-cer{padding:0 12px 10px}"
++"#c70-cer .cx{background:var(--card);border:1px solid var(--borda);border-radius:12px;padding:10px}"
++"#c70-svg{width:100%;max-width:520px;display:block;margin:0 auto;background:var(--bg2);border-radius:8px}"
++"#c70-svg path,#c70-svg ellipse,#c70-svg circle{stroke:#0b0e14;stroke-width:1.5;cursor:pointer;transition:fill .3s}"
++"#c70-svg text{fill:#fff;font-size:8px;pointer-events:none;font-family:sans-serif}"
++"#c70-modos{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}"
++"#c70-modos button{min-height:32px;padding:4px 9px;font-size:12px;background:var(--card);border:1px solid var(--borda);color:var(--tx);border-radius:6px;cursor:pointer}"
++"#c70-modos button.sel{border-color:var(--acc);background:var(--acc)}"
++"#c70-det{font-size:12px;color:var(--tx2);min-height:34px;margin-top:6px}"
++"#c70-chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:6px;margin-top:8px}"
++"#c70-chips div{background:var(--bg2);border:1px solid var(--borda);border-radius:8px;padding:5px 8px}"
++"#c70-chips small{display:block;color:var(--tx3);font-size:10px;text-transform:uppercase}"
++"#c70-chips b{font-family:var(--mono);font-size:15px}"
++".c70bar{margin-top:6px;font-size:11px;color:var(--tx2)}"
++".c70bar div.t{background:var(--bg2);border-radius:5px;height:9px;overflow:hidden}"
++".c70bar div.f{height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));width:0}";
+var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+var FORMAS = {
+frontal:   ["path","M48,105 C40,62 78,30 128,34 L128,112 C100,118 70,116 48,105 Z",82,72],
+parietal:  ["path","M132,34 C170,28 205,40 214,66 L214,112 L132,112 Z",172,72],
+occipital: ["path","M218,66 C242,80 246,108 230,124 L216,116 Z",226,98],
+temporal:  ["path","M62,120 C90,132 150,136 204,124 L200,146 C150,160 96,158 70,142 Z",104,146],
+cerebelo:  ["path","M190,130 C210,128 236,134 238,152 C230,168 200,170 186,158 Z",212,154],
+tronco:    ["path","M150,150 L172,150 L168,196 L152,196 Z",160,176],
+talamus:   ["circle","cx='140' cy='96' r='12'",140,98],
+hipocampo: ["ellipse","cx='128' cy='132' rx='26' ry='7'",128,134]
+};
+var MODOS = {
+neuronio:{pre:"neuronio_",inv:false,max:100,rot:"Neurônios"},
+sinapse:{pre:"sinapse_",inv:false,max:100,rot:"Sinapses"},
+saude:{pre:"saude_",inv:false,max:100,rot:"Saúde"},
+tau:{pre:"tau_",inv:true,max:60,rot:"Tau"},
+abeta:{pre:"abeta_",inv:true,max:60,rot:"Amiloide"}
+};
+var modo = "neuronio", sel = null;
+function g(id){ return REG[id] ? getP(id) : 0; }
+var sec = document.createElement("section"); sec.id = "c70-cer";
+var h = "<h2 style='color:var(--acc2);font-size:14px;margin-bottom:6px'>🧠 Cérebro por região</h2><div class='cx'><div id='c70-modos'>";
+for(var m in MODOS) h += "<button data-m='"+m+"' onclick=\"c70Modo('"+m+"')\">"+MODOS[m].rot+"</button>";
+h += "</div><svg id='c70-svg' viewBox='0 0 280 200'>";
+for(var r in FORMAS){ var f = FORMAS[r];
+var attrs = f[0]==="path" ? "d='"+f[1]+"'" : f[1];
+h += "<"+f[0]+" id='c70-r-"+r+"' "+attrs+" fill='#345' onclick=\"c70Regiao('"+r+"')\"/>";
+}
+for(var r2 in FORMAS) h += "<text x='"+FORMAS[r2][2]+"' y='"+FORMAS[r2][3]+"' text-anchor='middle'>"+r2.substring(0,4)+"</text>";
+h += "</svg><div id='c70-det'>Toque numa região para ver os detalhes.</div>"
++ "<div id='c70-chips'></div><div id='c70-bars'></div></div>";
+sec.innerHTML = h;
+var ref = document.getElementById("grafico-box");
+if(ref) ref.parentNode.insertBefore(sec, ref);
+window.c70Modo = function(m){ modo = m; atualizar(); };
+window.c70Regiao = function(r){ sel = r; atualizar(); };
+function cor(r){
+var c = MODOS[modo], v = g(c.pre+r), hue;
+if(c.inv) hue = 120*(1 - clamp(v/c.max,0,1));
+else hue = 120*clamp((v-30)/70,0,1);
+return "hsl("+hue.toFixed(0)+",65%,42%)";
+}
+var CHIPS = [["braak_estagio","Braak"],["pet_amiloide","PET Aβ"],["liquor_ab42","Aβ42 LCR"],["ptau217","p-tau217"],
+["nfl","NfL"],["gfap","GFAP"],["rm_vol_hipocampo","Vol. hipoc."],["cdr","CDR"],["estagio","Estágio"]];
+var BARRAS = [["mmse","MMSE",30],["memoria","Memória",100],["executiva","Executiva",100],["saudavel_celular","Saúde celular",100],
+["regeneracao_score","Regeneração",100],["vigor_global","Vigor global",100]];
+function atualizar(){
+if(!S) return;
+var b = document.querySelectorAll("#c70-modos button"), i;
+for(i=0;i<b.length;i++) b[i].className = b[i].getAttribute("data-m")===modo ? "sel" : "";
+for(var r in FORMAS){ var el = document.getElementById("c70-r-"+r);
+if(!el) continue;
+el.setAttribute("fill", cor(r));
+el.style.stroke = (r===sel) ? "#fff" : "#0b0e14";
+}
+if(sel){
+document.getElementById("c70-det").innerHTML = "<b style='color:var(--tx)'>"+sel+"</b> — neurônios "+g("neuronio_"+sel).toFixed(1)
++"% · sinapses "+g("sinapse_"+sel).toFixed(1)+"% · saúde "+g("saude_"+sel).toFixed(1)+"% · tau "+g("tau_"+sel).toFixed(1)
++" · Aβ "+g("abeta_"+sel).toFixed(1);
+}
+var A = g("atn_a")>0.5, T = g("atn_t")>0.5, N = g("atn_n")>0.5;
+var ch = "<div><small>AT(N)</small><b>"+(A?"A+":"A−")+" "+(T?"T+":"T−")+" "+(N?"N+":"N−")+"</b></div>";
+for(i=0;i<CHIPS.length;i++){ var id = CHIPS[i][0]; if(!REG[id]) continue;
+var v = getP(id), cl = statusDe(id,v);
+ch += "<div><small>"+CHIPS[i][1]+"</small><b class='"+cl+"'>"+(Math.abs(v)>=100?v.toFixed(0):v.toFixed(1))+"</b></div>";
+}
+document.getElementById("c70-chips").innerHTML = ch;
+var bh = "";
+for(i=0;i<BARRAS.length;i++){ var bid = BARRAS[i][0]; if(!REG[bid]) continue;
+var val = getP(bid), pct = clamp(val/BARRAS[i][2]*100,0,100);
+bh += "<div class='c70bar'>"+BARRAS[i][1]+" — "+val.toFixed(1)+"<div class='t'><div class='f' style='width:"+pct.toFixed(0)+"%'></div></div></div>";
+}
+document.getElementById("c70-bars").innerHTML = bh;
+}
+var _renderTudo_v4 = renderTudo;
+renderTudo = function(){ _renderTudo_v4(); atualizar(); };
+})();
+/* ================================================================
+CÓRTEX-70 v4 — PARTE 9/9: BLOCO 7 — ANÁLISES, PERFIS, CSV, SAVE, ALERTAS
+Comparação A/B, perfis Parkinson/Lewy/FTD/TCE, CSV diário/horário,
+save completo (PRNG, fármacos, travas, favoritos), faixa de alertas.
+================================================================ */
+P("alfa_sinucleina","estado","doenca_extra",0,"carga",{fis:[0,5],plaus:[0,100]});
+(function(){
+var css = "#c7-ov{position:fixed;inset:0;z-index:95;background:var(--bg);overflow-y:auto;padding:0 0 60px}"
++"#c7-ov .top{position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--borda);padding:8px 10px;display:flex;align-items:center;gap:6px}"
++"#c7-ov .bx{background:var(--card);border:1px solid var(--borda);border-radius:10px;margin:10px;padding:10px}"
++"#c7-ov .bx h3{font-size:13px;color:var(--acc2);margin-bottom:6px}"
++"#c7-ov .bx button{margin:3px 3px 3px 0;min-height:34px;font-size:12px;padding:5px 9px;background:var(--card);border:1px solid var(--borda);color:var(--tx);border-radius:6px;cursor:pointer}"
++"#c7-ov table{width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono)}"
++"#c7-ov td,#c7-ov th{padding:3px 4px;border-bottom:1px solid var(--borda);text-align:right}"
++"#c7-ov td:first-child,#c7-ov th:first-child{text-align:left}"
++"#c7-alert{display:none;background:#3a1420;color:#ffb3c1;border-bottom:1px solid #6b2233;padding:5px 12px;font-size:11.5px}";
+var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+var ov = document.createElement("div"); ov.id = "c7-ov"; ov.style.display = "none"; document.body.appendChild(ov);
+var topo = document.getElementById("topo");
+var b = document.createElement("button"); b.textContent = "🔬 Análises"; b.onclick = abrir; topo.appendChild(b);
+var al = document.createElement("div"); al.id = "c7-alert"; topo.parentNode.insertBefore(al, topo.nextSibling);
+var EM_EXECUCAO_AB = false;
+function abrir(){
+if(!S) return;
+ov.style.display = "block";
+ov.innerHTML = "<div class='top'><b>🔬 Análises</b><span style='flex:1'></span><button class='prim' onclick='c7Fechar()'>✕ Fechar</button></div>"
++"<div class='bx'><h3>Comparação A/B (mesma semente)</h3><div style='font-size:12px;color:var(--tx2)'>A = mesmo paciente com TODOS os tratamentos desligados. B = com o que está ativo agora. Não altera o paciente atual.</div>"
++"<div style='margin-top:6px'>Duração: <select id='c7-dias'><option value='30'>30 dias</option><option value='90' selected>90 dias</option><option value='180'>180 dias</option><option value='365'>365 dias</option></select> "
++"<button class='prim' onclick='c7AB()'>▶ Comparar</button></div><div id='c7-res' style='margin-top:8px;font-size:12px'></div></div>"
++"<div class='bx'><h3>Perfis clínicos (aplicam ao paciente atual)</h3>"
++"<button onclick=\"c7Perfil('pd')\">Parkinson (hipótese)</button><button onclick=\"c7Perfil('lewy')\">Corpos de Lewy</button>"
++"<button onclick=\"c7Perfil('ftd')\">Frontotemporal</button><button onclick=\"c7Perfil('tce')\">TCE crônico</button>"
++"<div style='font-size:11px;color:var(--tx3)'>Ajustam neurônios, marcadores e ligam uma progressão lenta própria. Valores didáticos.</div></div>"
++"<div class='bx'><h3>Dados e save</h3><button onclick=\"c7CSV('dia')\">CSV diário</button><button onclick=\"c7CSV('hora')\">CSV horário</button>"
++"<button onclick='exportarJSON()'>💾 Save completo</button>"
++"<label style='font-size:12px;margin-left:6px'><input type='checkbox' id='c7-alcb' checked onchange='c7Alertas(this.checked)'> faixa de alertas</label></div>";
+}
+window.c7Fechar = function(){ ov.style.display = "none"; };
+/* ---------- A/B ---------- */
+var KEYS = ["mmse","carga_amiloide","placa_amiloide","tau_hipocampo","braak_estagio","neuronio_hipocampo","neuronio_frontal",
+"nfl","gfap","bdnf","neurogenese","saudavel_celular","massa_muscular","vigor_global","risco_morte_ano"];
+function clonar(s){ return JSON.parse(JSON.stringify(s)); }
+function rodar(clone, n){
+var ant = S; S = clone;
+try{ for(var i=0;i<n;i++){ if(S.morto) break; tick(); } } finally { S = ant; }
+}
+window.c7AB = function(){
+if(EM_EXECUCAO_AB) return;
+if(JOGANDO) togglePlay();
+var dias = parseInt(document.getElementById("c7-dias").value,10), total = dias*1440;
+var ativos = DRUG_DEFS.filter(function(d){ return getP("drug_"+d.id+"_on")>0.5; });
+var out = document.getElementById("c7-res");
+if(!ativos.length){ out.textContent = "Nenhum tratamento ativo. Ative algo em 💊 Fármacos e volte."; return; }
+var ini = clonar(S), A = clonar(S), B = clonar(S), i;
+for(i=0;i<DRUG_DEFS.length;i++) A.params["drug_"+DRUG_DEFS[i].id+"_on"] = 0;
+var feitos = 0, passo = 1440*2;
+EM_EXECUCAO_AB = true;
+function loop(){
+var n = Math.min(passo, total-feitos);
+rodar(A, n); rodar(B, n); feitos += n;
+out.textContent = "Simulando... dia "+Math.round(feitos/1440)+" de "+dias+" (dois pacientes; 365 dias pode levar minutos)";
+if(feitos < total) setTimeout(loop, 0);
+else { EM_EXECUCAO_AB = false; mostrar(ini, A, B, dias, ativos); }
+}
+setTimeout(loop, 0);
+};
+function f(v){ return v===undefined||v===null ? "-" : (Math.abs(v)>=100 ? v.toFixed(0) : v.toFixed(2)); }
+function mostrar(ini, A, B, dias, ativos){
+var h = "<div>Tratamentos em B: "+ativos.map(function(d){return d.nome;}).join(", ")+"</div>"
++"<div>A: "+(A.morto?"óbito":"vivo")+" · B: "+(B.morto?"óbito":"vivo")+"</div>"
++"<table><tr><th>variável</th><th>início</th><th>A sem</th><th>B com</th><th>Δ B−A</th></tr>";
+for(var i=0;i<KEYS.length;i++){ var k = KEYS[i]; if(!REG[k]) continue;
+var a = A.params[k], b = B.params[k], d = (a!==undefined&&b!==undefined) ? b-a : undefined;
+h += "<tr><td>"+k+"</td><td>"+f(ini.params[k])+"</td><td>"+f(a)+"</td><td>"+f(b)+"</td><td>"+(d===undefined?"-":(d>0?"+":"")+f(d))+"</td></tr>";
+}
+h += "</table><div style='color:var(--tx3);margin-top:4px'>Horizonte: "+dias+" d. Resultados didáticos; o sentido do Δ depende da variável.</div>";
+document.getElementById("c7-res").innerHTML = h;
+}
+/* ---------- perfis clínicos ---------- */
+window.c7Perfil = function(k){
+var T = "trava", r;
+if(k==="pd"){ setP("neuronio_tronco",70,T); setP("alfa_sinucleina",25,T); setP("humor",60,T); }
+if(k==="lewy"){ setP("neuronio_tronco",80,T); setP("alfa_sinucleina",30,T); setP("neuronio_occipital",92,T); setP("neuronio_parietal",92,T); }
+if(k==="ftd"){ setP("neuronio_frontal",80,T); setP("neuronio_temporal",88,T); }
+if(k==="tce"){ for(var i=0;i<REGIOES.length;i++){ r = REGIOES[i]; setP("neuronio_"+r, getP("neuronio_"+r)-4, T); }
+setP("nfl",45,T); setP("gfap",140,T); setP("bhe_perm",80,T); }
+S.perfilExtra = k;
+addEvento("🧬 Perfil aplicado: "+({pd:"Parkinson",lewy:"Corpos de Lewy",ftd:"Frontotemporal",tce:"TCE crônico"})[k]);
+renderTudo();
+};
+function stepPerfilExtra(){
+var p = S.perfilExtra; if(!p) return;
+var reserva = getP("reserva_cognitiva"), limpa = getP("limpeza_celular")/100;
+function perde(r, x){ setP("neuronio_"+r, Math.max(0, getP("neuronio_"+r)-x), "motor"); }
+if(p==="pd" || p==="lewy"){
+var a = getP("alfa_sinucleina");
+a = clamp(a + 0.015*(1-a/100) - 0.004*limpa*a/100, 0, 100); setP("alfa_sinucleina", a, "motor");
+var dmg = 0.004*a/10;
+perde("tronco", dmg);
+if(p==="lewy"){ perde("temporal",0.5*dmg); perde("parietal",0.5*dmg); perde("occipital",0.5*dmg); }
+else if(a>50) perde("frontal",0.2*dmg);
+}
+if(p==="ftd"){ perde("frontal", 0.006*(1.6-0.6*reserva)); perde("temporal", 0.004*(1.6-0.6*reserva)); }
+if(p==="tce"){ perde("hipocampo",0.0015); perde("frontal",0.0015); perde("temporal",0.0015); }
+}
+var _stepSlow_v7 = stepSlow;
+stepSlow = function(){ _stepSlow_v7(); stepPerfilExtra(); };
+var _stepFast_v7 = stepFast;
+stepFast = function(){
+_stepFast_v7();
+if(S.perfilExtra==="pd" || S.perfilExtra==="lewy") setP("dopamina", getP("dopamina")*(0.35+0.65*getP("neuronio_tronco")/100), "motor");
+};
+/* ---------- CSV ---------- */
+window.c7CSV = function(tipo){
+var dados = tipo==="dia" ? S.histDia : S.histHora;
+if(!dados.length){ alert("Ainda não há dados "+(tipo==="dia"?"diários (avance pelo menos 2 dias).":"horários (avance pelo menos 2 h).")); return; }
+var ks = Object.keys(dados[dados.length-1].v||{});
+var linhas = ["t_min;"+ks.join(";")];
+for(var i=0;i<dados.length;i++){
+var l = [dados[i].t];
+for(var j=0;j<ks.length;j++){ var c = dados[i].v[ks[j]]; l.push(c ? c.avg.toFixed(3).replace(".",",") : ""); }
+linhas.push(l.join(";"));
+}
+baixar("\ufeff"+linhas.join("\n"), "cortex70_"+(tipo==="dia"?"diario":"horario")+".csv", "text/csv");
+};
+function baixar(txt, nome, mime){
+var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt],{type:mime})); a.download = nome; a.click();
+}
+/* ---------- SAVE COMPLETO (sobrescreve o exportarJSON da Parte 5) ---------- */
+window.exportarJSON = function(){
+if(!S) return;
+var travas = {}, favs = [], id;
+for(var i=0;i<REG_ORDER.length;i++){ id = REG_ORDER[i];
+if(REG[id].travado) travas[id] = {t:REG[id].travado, v:REG[id].valor};
+if(REG[id].favorito) favs.push(id);
+}
+var dados = { schema_version:SCHEMA_VERSION, motor_version:MOTOR_VERSION, seed:S.seed, t:S.t, cfg:S.cfg,
+params:S.params, log:S.log, histMin:S.histMin||[], histHora:S.histHora, histDia:S.histDia,
+extra:{ rng:S.rng.s, drugs:S.drugs, perfil:S.perfilExtra||null, travas:travas, favoritos:favs,
+flags:{geneApoeFeito:S.geneApoeFeito||0, geneBdnfAtivo:S.geneBdnfAtivo||0, imobilidade:S.imobilidade||0} } };
+baixar(JSON.stringify(dados,null,2), "cortex70_save.json", "application/json");
+addLog("fx","💾 Save completo exportado (t="+fmtT(S.t)+")");
+};
+window.importarJSON = function(inp){
+var fl = inp.files&&inp.files[0]; if(!fl) return;
+var rd = new FileReader();
+rd.onload = function(){
+try{
+var d = JSON.parse(rd.result), x = d.extra || {};
+S = { schema_version:d.schema_version||SCHEMA_VERSION, motor_version:d.motor_version||MOTOR_VERSION, t:d.t||0, seed:d.seed||1,
+rng:{s:(x.rng!==undefined ? x.rng : (d.seed||1))}, cfg:d.cfg||{}, params:d.params||{}, log:d.log||[],
+events:[], fx:{}, fxLento:{}, histMin:d.histMin||[], histHora:d.histHora||[], histDia:d.histDia||[],
+ultHora:-1, ultDia:-1, morto:!!(d.params && d.params.vivo===0), contHora:0,
+drugs:(x.drugs||[]), perfilExtra:x.perfil||null };
+if(x.flags){ S.geneApoeFeito = x.flags.geneApoeFeito; S.geneBdnfAtivo = x.flags.geneBdnfAtivo; S.imobilidade = x.flags.imobilidade; }
+if(!S.drugs.length) for(var i=0;i<DRUG_DEFS.length;i++) S.drugs.push({id:DRUG_DEFS[i].id,A:0,C:0,proxDose:S.t+60});
+if(typeof garantirFarmacos==="function") garantirFarmacos();
+for(var k in S.params){ if(REG[k]) REG[k].valor = S.params[k]; }
+for(var q=0;q<REG_ORDER.length;q++){ REG[REG_ORDER[q]].travado = null; REG[REG_ORDER[q]].favorito = false; }
+for(var tk in (x.travas||{})){ if(REG[tk]){ REG[tk].travado = x.travas[tk].t; REG[tk].valor = x.travas[tk].v; } }
+(x.favoritos||[]).forEach(function(fv){ if(REG[fv]) REG[fv].favorito = true; });
+document.getElementById("criacao").style.display = "none";
+document.getElementById("app").style.display = "flex";
+addLog("fx","📂 Save completo importado (t="+fmtT(S.t)+", PRNG e fármacos restaurados)");
+renderTudo();
+}catch(e){ alert("Arquivo inválido: "+e.message); }
+inp.value = "";
+};
+rd.readAsText(fl);
+};
+/* ---------- faixa de alertas ---------- */
+var ALERTAS_ON = true, EXCL = {farmacia:1, morte:1, exames:1, tau_regional:1, amiloide_regional:1, doenca_extra:1};
+window.c7Alertas = function(on){ ALERTAS_ON = on; if(!on) al.style.display = "none"; };
+function alertas(){
+if(!ALERTAS_ON || !S || EM_EXECUCAO_AB) return;
+var lista = [];
+for(var i=0;i<REG_ORDER.length;i++){ var id = REG_ORDER[i], r = REG[id];
+if(EXCL[r.grupo] || !r.faixa_fisio || S.params[id]===undefined) continue;
+var v = S.params[id], lo = r.faixa_fisio[0], hi = r.faixa_fisio[1], w = Math.max(1e-9, hi-lo), dev = 0;
+if(v<lo) dev = (lo-v)/w; else if(v>hi) dev = (v-hi)/w;
+if(dev>0.05) lista.push({id:id, v:v, lo:lo, hi:hi, dev:dev});
+}
+lista.sort(function(a,b){ return b.dev-a.dev; });
+if(!lista.length){ al.style.display = "none"; return; }
+al.style.display = "block";
+al.innerHTML = "⚠ Fora da faixa fisiológica ("+lista.length+"): " + lista.slice(0,5).map(function(x){
+return x.id+" "+(Math.abs(x.v)>=100?x.v.toFixed(0):x.v.toFixed(1))+" ("+x.lo+"–"+x.hi+")"; }).join(" · ");
+}
+var _renderTudo_v7 = renderTudo;
+renderTudo = function(){ _renderTudo_v7(); alertas(); };
+})();
+
+/* ================= N5: correções finais ================= */
+(function(){
+var FX_MOT={ros:1,bdnf:1,acetilcolina:1,glicose:1,homa_ir:1,autofagia:1,dopamina:1,serotonina:1,humor:1,ldl:1,neurogenese:1,depuracao_ab:1};
+function escFx(id){var r=REG[id];if(!r)return 0;var w=r.faixa_fisio?Math.abs(r.faixa_fisio[1]-r.faixa_fisio[0]):0,p=r.faixa_plaus?Math.abs(r.faixa_plaus[1]):0;return Math.max(w,0.15*p,1);}
+stepFarmacos=function(){
+  if(!S.drugs)S.drugs=[];
+  S.fx={};S.fxLento={};
+  for(var i=0;i<DRUG_DEFS.length;i++){
+    var def=DRUG_DEFS[i],pid="drug_"+def.id,on=getP(pid+"_on")>=0.5,inst=null;
+    for(var j=0;j<S.drugs.length;j++){if(S.drugs[j].id===def.id){inst=S.drugs[j];break;}}
+    if(!inst){if(!on)continue;inst={id:def.id,A:0,C:0,proxDose:S.t};S.drugs.push(inst);}
+    if(!on&&inst.A<1e-6){inst.A=0;inst.C=0;continue;}
+    if(on&&S.t>=inst.proxDose){
+      if(rand()<getP(pid+"_adesao"))inst.A+=getP(pid+"_dose")*def.F;
+      inst.proxDose=S.t+(def.via==="atividade"?24:def.intervaloH)*60;
+    }
+    inst.A*=Math.exp(-Math.LN2/def.t12/60);
+    inst.C=inst.A/(def.Vd*70)*1000;
+    setP(pid+"_conc",inst.C,"motor");
+    var ke=Math.LN2/def.t12,iv=def.via==="atividade"?24:def.intervaloH,tau=Math.max(def.t12,iv/3);
+    inst.Ce=(inst.Ce||0)+(inst.A-(inst.Ce||0))*(1-Math.exp(-1/(60*tau)));
+    var cn=inst.Ce/(def.doseMax*0.5*def.F/(ke*iv));
+    if(cn<0.01)continue;
+    var E=def.Emax*Math.pow(cn,def.Hill)/(Math.pow(def.EC50,def.Hill)+Math.pow(cn,def.Hill));
+    for(var a in def.alvos)S.fx[a]=(S.fx[a]||0)+E*def.alvos[a]*escFx(a);
+  }
+  if(S.pasOff)S.fx.pas=(S.fx.pas||0)+S.pasOff;
+  S.fxLento.depuracao_ab=S.fx.depuracao_ab||0;
+};
+function des(){var o=S.fxOff||{};for(var k in o)S.params[k]-=o[k];S.fxOff={};}
+function apl(){var o={};for(var k in S.fx){if(FX_MOT[k]||!REG[k]||typeof S.params[k]!=="number")continue;S.params[k]+=S.fx[k];o[k]=S.fx[k];}S.fxOff=o;}
+var _tk=tick;
+tick=function(){des();_tk();apl();if(S.histHora.length>720)S.histHora.splice(0,S.histHora.length-720);if(S.histDia.length>1200)S.histDia.shift();};
+snap=function(){var v={};for(var i=0;i<REG_ORDER.length;i++){var id=REG_ORDER[i];if(id.indexOf("drug_")===0)continue;var x=S.params[id];if(typeof x==="number"){x=+x.toPrecision(4);v[id]={avg:x,min:x,max:x};}}return {t:S.t,v:v};};
+var _cp=criarPaciente;
+criarPaciente=function(c){var s=_cp(c);S.fxOff={};S.pasOff=getP("pas")-120;return s;};
+window.criarPaciente=criarPaciente;
+})();
+
+
+/* ================================================================
+CÓRTEX-70 v5 — N6: CORREÇÕES CRÍTICAS
+================================================================ */
+(function(){
+var FX_MOT={ros:1,bdnf:1,acetilcolina:1,glicose:1,homa_ir:1,autofagia:1,
+  dopamina:1,serotonina:1,humor:1,ldl:1,neurogenese:1,depuracao_ab:1};
+var FX_RATE={
+  carga_amiloide:-0.005, placa_amiloide:-0.004, ptau217:-0.002,
+  memoria:0.40, executiva:0.40, linguagem:0.20, orientacao:0.20,
+  neuronio_hipocampo:0.002, neuronio_frontal:0.002, neuronio_tronco:0.002,
+  neuronio_temporal:0.002, neuronio_parietal:0.002, neuronio_occipital:0.002,
+  massa_muscular:0.05, densidade_ossea:0.01, imunocompetencia:0.05, pele_score:0.03,
+  hb:0.05, albumina:0.02, tfg:0.01, plaquetas:-0.05,
+  pas:0.05, pad:0.05, bhe_perm:0.02, pcr:0.05, il6:0.05, triglicerideos:0.05,
+  estresse:0.30, sono_horas:0.05, apneia_iah:0.05,
+  gaba:1.0, glutamato:1.0, noradrenalina:1.0, melatonina_n:1.0, cortisol:0.5,
+  ampk:0.5, sirt1:0.3, nad:0.5, insulina:0.5, fc:0.5,
+  mito_potencial:0.5, plasticidade_sinaptica:0.2, mielina_score:0.1
+};
+function aplicarFxTaxas(){
+  if(!S||!S.fx) return;
+  for(var k in S.fx){
+    if(FX_MOT[k]) continue;
+    if(!REG[k] || typeof S.params[k]!=="number") continue;
+    var r=REG[k], novo=S.params[k]+S.fx[k]*(FX_RATE[k]||0.02)/1440;
+    if(r.modo!=="deus"&&r.faixa_plaus) novo=clamp(novo,r.faixa_plaus[0],r.faixa_plaus[1]);
+    S.params[k]=novo;
+  }
+}
+var _tickN6=tick;
+tick=function(){ aplicarFxTaxas(); _tickN6(); };
+var _cpN6=criarPaciente;
+criarPaciente=function(c){ var s=_cpN6(c); S.pasOff=0; return s; };
+window.criarPaciente=criarPaciente;
+var _stepMidN6=stepMid;
+stepMid=function(){
+  _stepMidN6();
+  setP("homa_ir", clamp(getP("homa_ir")-efeito("homa_ir"),0.2,20), "motor");
+};
+var _stepFastN6=stepFast;
+stepFast=function(){ _stepFastN6(); sonoArquitetado(); };
+var _stepSlowN6=stepSlow;
+stepSlow=function(){
+  _stepSlowN6();
+  for(var i=0;i<REGIOES.length;i++)
+    setP("tau_"+REGIOES[i], clamp(getP("tau_"+REGIOES[i]),0,100), "motor");
+};
+var _stepSlowN6b=stepSlow;
+stepSlow=function(){
+  _stepSlowN6b();
+  var def=0;
+  for(var i=0;i<REGIOES.length;i++){
+    var r=REGIOES[i];
+    def+=PESO_COG[r]*(100-getP("sinapse_"+r));
+  }
+  var idade=getP("idade");
+  var mmse=clamp(30
+    -0.5*Math.max(0, def-2-0.03*getP("reserva_cognitiva"))
+    -0.02*Math.max(0,idade-70)
+    +0.05*clamp(getP("acetilcolina")-100,-40,40)/4
+    +0.02*clamp(getP("bdnf")-100,-50,100)/5
+    +efeito("mmse")*0.05, 0, 30);
+  setP("mmse",lerp(getP("mmse"),mmse,0.25),"motor");
+  var m=getP("mmse");
+  setP("cdr", m>=27?0:(m>=22?0.5:(m>=15?1:(m>=8?2:3))), "motor");
+  setP("estagio", m>=27?0:(m>=22?1:(m>=15?2:(m>=8?3:4))), "motor");
+  setP("memoria", clamp(m*3.2+0.3*(getP("sinapse_hipocampo")-70),0,100), "motor");
+};
+})();
+
+/* ================================================================
+CÓRTEX-70 v5 — N7: PACIENTE REAL
+================================================================ */
+(function(){
+P("peso_kg","estado","paciente",70,"kg",{fis:[45,120],plaus:[30,200]});
+P("altura_m","estado","paciente",1.68,"m",{fis:[1.45,1.9],plaus:[1.2,2.2]});
+var G=[
+["📋 Identificação do estudo (anonimizada)",[
+ ["st_id","ID do estudo (código, não nome)","text",null,null,null,"Ex: LUME-014-BL"],
+ ["st_site","Centro/pesquisador","text",null,null,null,"Opcional"],
+ ["st_visita","Visita","select",["baseline","seguimento_3m","seguimento_6m","seguimento_12m","seguimento_24m"],null,null,""],
+ ["st_data","Data da coleta","date",null,null,null,""],
+ ["st_assim","Assimilar dados ao simular (0=off, 0.05=sutil, 0.2=forte)","num",0,0.2,0.01,"Puxa o simulador para os pontos reais no seguimento"]
+]],
+["📏 Antropometria",[
+ ["peso_kg","Peso","kg",30,200,0.1,""],
+ ["altura_m","Altura","m",1.2,2.2,0.01,""]
+]],
+["❤️ Vitais",[
+ ["pas","Pressão arterial sistólica","mmHg",60,260,1,""],
+ ["pad","Pressão arterial diastólica","mmHg",30,160,1,""],
+ ["fc","Frequência cardíaca","bpm",30,220,1,""],
+ ["spo2","SpO₂","%",50,100,0.1,""],
+ ["temp","Temperatura","°C",34,42,0.1,""]
+]],
+["🧪 Bioquímica",[
+ ["glicose","Glicose de jejum","mg/dL",20,600,1,""],
+ ["insulina","Insulina de jejum","µU/mL",0,100,0.1,"→ HOMA-IR calculado"],
+ ["creatinina","Creatinina","mg/dL",0.3,10,0.01,"→ TFG (CKD-EPI) calculada"],
+ ["ureia","Ureia","mg/dL",5,200,1,""],
+ ["tgo","TGO (AST)","U/L",5,400,1,""],
+ ["tgp","TGP (ALT)","U/L",5,400,1,""],
+ ["ggt","GGT","U/L",5,500,1,""],
+ ["albumina","Albumina","g/dL",1.5,6,0.1,""],
+ ["pcr","PCR (proteína C reativa)","mg/L",0,50,0.1,""],
+ ["ldl","LDL-colesterol","mg/dL",20,300,1,""],
+ ["hdl","HDL-colesterol","mg/dL",15,120,1,""],
+ ["triglicerideos","Triglicerídeos","mg/dL",25,600,1,""]
+]],
+["🩸 Hemograma",[
+ ["hb","Hemoglobina","g/dL",5,20,0.1,""],
+ ["leucocitos","Leucócitos","mil/µL",1,30,0.1,""],
+ ["plaquetas","Plaquetas","mil/µL",40,700,1,""]
+]],
+["🧠 Cognição e funcional",[
+ ["mmse","MMSE (0–30)","pts",0,30,1,"Se vazio, usa o do simulador"],
+ ["escolaridade","Escolaridade (anos)","anos",0,20,1,"Alimenta reserva cognitiva"],
+ ["moca","MoCA (0–30, opcional)","pts",0,30,1,"Registrado no estudo"]
+]],
+["🔬 Biomarcadores de Alzheimer",[
+ ["ptau217","p-tau217 plasma","pg/mL",0,30,0.01,"Alimenta tau regional (Braak)"],
+ ["nfl","Neurofilamento leve (NfL)","pg/mL",3,500,1,""],
+ ["gfap","GFAP","pg/mL",10,2000,1,""],
+ ["liquor_ab42","Aβ42 no LCR","pg/mL",100,1500,1,"→ carga de amiloide derivada"],
+ ["pet_cl","PET amiloide (CL, se houver)","CL",0,150,0.1,"Prevalece sobre o LCR"],
+ ["rm_vol_hipocampo","Volume hipocampal RM (% do esperado)","%",30,110,0.1,"→ neurônios hipocampais derivados"]
+]],
+["🧬 Genética (opcional)",[
+ ["apoe4","Alelos APOE ε4 (0, 1 ou 2)","n",0,2,1,"Com consentimento específico"]
+]],
+["🌙 Sono e estilo de vida",[
+ ["sono_horas","Duração média do sono","h",0,14,0.1,""],
+ ["apneia_iah","IAH (apneia)","ev/h",0,100,0.1,""],
+ ["atividade_fisica","Atividade física (0=none,1=leve,2=mod,3=int)","0-3",0,3,1,""],
+ ["tabagismo","Tabagismo (maços/ano)","",0,80,1,""],
+ ["alcool","Álcool (doses/semana)","",0,30,1,""]
+]]
+];
+var css="#pr-ov{position:fixed;inset:0;z-index:96;background:var(--bg);overflow-y:auto;padding:0 0 70px}"
++"#pr-ov .top{position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--borda);padding:8px 12px;display:flex;gap:6px;align-items:center;z-index:2}"
++"#pr-ov fieldset{background:var(--card);border:1px solid var(--borda);border-radius:10px;margin:10px;padding:10px}"
++"#pr-ov legend{color:var(--acc2);font-size:12px;padding:0 6px}"
++"#pr-ov label{display:block;font-size:12px;color:var(--tx2);margin:8px 0 3px}"
++"#pr-ov input,#pr-ov select{width:100%;padding:7px;background:var(--bg2);border:1px solid var(--borda);border-radius:6px;color:var(--tx);font-size:13px}"
++"#pr-ov .duas{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}"
++"#pr-ov .btn{margin:10px;padding:12px;width:calc(100% - 20px);background:var(--ok);border:none;border-radius:8px;color:#06281c;font-weight:700;font-size:14px;cursor:pointer}"
++"#pr-ov .nota{font-size:11px;color:var(--tx3);padding:0 12px}"
++"#pr-rel{margin:10px;padding:10px;background:var(--card);border-radius:10px;font-size:12px;font-family:var(--mono)}";
+var st=document.createElement("style"); st.textContent=css; document.head.appendChild(st);
+var ov=document.createElement("div"); ov.id="pr-ov"; ov.style.display="none"; document.body.appendChild(ov);
+var btn=document.createElement("button"); btn.textContent="🧍 Paciente real";
+btn.onclick=abrir; document.getElementById("topo").appendChild(btn);
+function abrir(){
+  if(!S) return;
+  var h="<div class='top'><b>🧍 Dados reais do paciente (estudo)</b><span style='flex:1'></span>"
+    +"<button class='prim' onclick='prFechar()'>✕ Fechar</button></div>"
+    +"<div class='nota'>⚠ Pesquisa/didático — não é diagnóstico. LGPD: proibido nome, CPF ou qualquer identificador. Use apenas código de estudo.</div>";
+  for(var g=0; g<G.length; g++){
+    h+="<fieldset><legend>"+G[g][0]+"</legend><div class='duas'>";
+    var f=G[g][1];
+    for(var i=0;i<f.length;i++){
+      var x=f[i], v=(S.studyForm&&S.studyForm[x[0]]!==undefined)?S.studyForm[x[0]]:"";
+      h+="<div><label>"+x[1]+(x[2]&&x[2]!=="text"&&x[2]!=="date"&&x[2]!=="select"?" ("+x[2]+")":"")+(x[6]?" — <span style='color:var(--tx3)'>"+x[6]+"</span>":"")+"</label>";
+      if(x[3]==="select"){
+        h+="<select id='pr-"+x[0]+"'>";
+        for(var o=0;o<x[3].length;o++) h+="<option "+(v===x[3][o]?"selected":"")+">"+x[3][o]+"</option>";
+        h+="</select>";
+      } else {
+        h+="<input id='pr-"+x[0]+"' type='"+(x[3]==="text"?"text":x[3]==="date"?"date":"number")+"' step='any' value=\""+(v!==""?v:"")+"\" "+(x[4]!==null?"min='"+x[4]+"'":"")+(x[5]!==null?" max='"+x[5]+"'":"")+">";
+      }
+      h+="</div>";
+    }
+    h+="</div></fieldset>";
+  }
+  h+="<fieldset><legend>💊 Medicações em uso (marque e ajuste a dose)</legend><div class='duas'>";
+  for(var d=0; d<DRUG_DEFS.length; d++){
+    var def=DRUG_DEFS[d];
+    h+="<div style='display:flex;gap:6px;align-items:center;margin-top:6px'>"
+      +"<input type='checkbox' id='prd-"+def.id+"' style='width:auto' "+(getP("drug_"+def.id+"_on")>0.5?"checked":"")+">"
+      +"<label style='margin:0;flex:1'>"+def.nome+"</label>"
+      +"<input type='number' id='prdd-"+def.id+"' style='width:80px' step='any' value='"+getP("drug_"+def.id+"_dose")+"'></div>";
+  }
+  h+="</div></fieldset>";
+  h+="<button class='btn' onclick='prAplicar()'>✔ Validar e aplicar ao paciente</button><div id='pr-rel'></div>";
+  ov.innerHTML=h; ov.style.display="block";
+}
+window.prFechar=function(){ ov.style.display="none"; };
+function val(id){ var e=document.getElementById("pr-"+id); if(!e||e.value==="") return null;
+  return e.type==="number"?parseFloat(e.value):e.value; }
+function ckdEpi(sexo,idade,creat){
+  var k=sexo==="F"?0.7:0.9, a=sexo==="F"?-0.241:-0.302;
+  var f=sexo==="F"?(creat<=k?1:Math.pow(creat/k,-1.200)):(creat<=k?1:Math.pow(creat/k,-1.200));
+  return Math.round(142*Math.pow(Math.min(creat/k,1),a)*f*Math.pow(0.9938,idade)* (sexo==="F"?1.012:1));
+}
+function reservaDeEscolaridade(anos){
+  return anos<5?25:(anos<9?40:(anos<12?55:(anos<16?70:85)));
+}
+window.prAplicar=function(){
+  var F={}, avisos=[], aplicados=[], k;
+  for(var g=0;g<G.length;g++) for(var i=0;i<G[g][1].length;i++){ k=G[g][1][i][0]; F[k]=val(k); }
+  S.studyForm=F;
+  function set(id,v,src){ if(v===null||isNaN(v)) return;
+    var r=REG[id], antes=getP(id);
+    setP(id,v,src||"trava");
+    if(r&&r.faixa_plaus&&(v<r.faixa_plaus[0]||v>r.faixa_plaus[1]))
+      avisos.push("⚠ "+id+"="+v+" fora da plausibilidade — ajustado para "+getP(id));
+    aplicados.push(id);
+  }
+  ["pas","pad","fc","spo2","temp","glicose","insulina","creatinina","ureia","tgo","tgp","ggt",
+   "albumina","pcr","ldl","hdl","triglicerideos","hb","leucocitos","plaquetas",
+   "sono_horas","apneia_iah","atividade_fisica","tabagismo","alcool","peso_kg","altura_m"]
+   .forEach(function(id){ set(id,F[id],"trava"); });
+  if(F.insulina!==null&&F.glicose!==null){
+    set("homa_ir", clamp(F.glicose*F.insulina/405,0.2,20),"trava");
+    aplicados.push("homa_ir (derivado)");
+  }
+  if(F.creatinina!==null) set("tfg", ckdEpi(S.cfg.sexo||"M", getP("idade"), F.creatinina),"trava");
+  if(F.escolaridade!==null) set("reserva_cognitiva", reservaDeEscolaridade(F.escolaridade),"trava");
+  if(F.apoe4!==null){ set("apoe_risco",F.apoe4,"trava"); set("carga_genetica",Math.min(3,F.apoe4),"trava"); }
+  if(F.pet_cl!==null) set("carga_amiloide",F.pet_cl,"trava");
+  else if(F.liquor_ab42!==null) set("carga_amiloide", clamp((1100-F.liquor_ab42)/6,0,150),"trava");
+  ["ptau217","nfl","gfap"].forEach(function(id){ set(id,F[id],"trava"); });
+  if(F.rm_vol_hipocampo!==null)
+    set("neuronio_hipocampo", clamp((F.rm_vol_hipocampo-40)/0.6,0,100),"trava");
+  if(F.mmse!==null){
+    set("mmse",F.mmse,"trava");
+    set("cdr", F.mmse>=27?0:(F.mmse>=22?0.5:(F.mmse>=15?1:(F.mmse>=8?2:3))),"trava");
+    set("estagio", F.mmse>=27?0:(F.mmse>=22?1:(F.mmse>=15?2:(F.mmse>=8?3:4))),"trava");
+    set("memoria", clamp(F.mmse*3.2,0,100),"trava");
+    aplicados.push("cdr/estagio (derivados)");
+  }
+  if(F.ptau217!==null){ initTau(); }
+  var meds=0;
+  for(var d=0;d<DRUG_DEFS.length;d++){
+    var c=document.getElementById("prd-"+DRUG_DEFS[d].id);
+    if(!c) continue;
+    var dose=parseFloat(document.getElementById("prdd-"+DRUG_DEFS[d].id).value)||0;
+    setP("drug_"+DRUG_DEFS[d].id+"_dose",dose,"trava");
+    setP("drug_"+DRUG_DEFS[d].id+"_on", c.checked?1:0,"trava");
+    if(c.checked){ meds++;
+      var inst0=null;
+      for(var j=0;j<S.drugs.length;j++) if(S.drugs[j].id===DRUG_DEFS[d].id){inst0=S.drugs[j];break;}
+      if(inst0) inst0.proxDose=S.t;
+    }
+  }
+  S.assimilacao = F.st_assim!==null? F.st_assim : 0;
+  S.study = { id:F.st_id||"SEM-ID", site:F.st_site||"", visita:F.st_visita||"baseline",
+              data:F.st_data||"", moca:F.moca!==null?F.moca:null, t: S.t };
+  S.studyPontos = S.studyPontos||[];
+  var MEDIVEL=["pas","pad","fc","glicose","ldl","mmse","ptau217","nfl","gfap","carga_amiloide","hb","creatinina","tfg","pcr"];
+  MEDIVEL.forEach(function(id){ if(F[id]!==null&&REG[id]) S.studyPontos.push({t:S.t,var:id,val:F[id],visita:S.study.visita}); });
+  classificarDiagnostico();
+  addLog("fx","🧍 Dados reais aplicados ("+S.study.id+" · "+S.study.visita+")");
+  renderTudo();
+  var h="<b>✔ Aplicado "+aplicados.length+" parâmetros · "+meds+" medicações · assimilação="+(S.assimilacao||0)+"</b><br>";
+  var mmseR=F.mmse!==null?F.mmse:getP("mmse"), ptauR=F.ptau217!==null?F.ptau217:getP("ptau217");
+  if(mmseR>=27&&ptauR>=1.5) avisos.push("🔎 MMSE normal com p-tau217 elevado: dissociação — revisar entrada ou considerar etiologia não-AD.");
+  if(F.pad!==null&&F.pas!==null&&F.pad>=F.pas) avisos.push("⛔ PAD ≥ PAS: impossível — corrigir.");
+  if(F.pet_cl!==null&&F.liquor_ab42!==null&&Math.abs(F.pet_cl-(1100-F.liquor_ab42)/6)>30)
+    avisos.push("🔎 Divergência PET × LCR >30 CL — métodos discordam; confira unidades.");
+  if(F.creatinina!==null&&getP("tfg")<60) avisos.push("🩺 TFG<60: ajustar doses renais (memantina, metformina).");
+  h+=avisos.length? avisos.join("<br>") : "Sem inconsistências detectadas.";
+  h+="<br><br><button class='c70b' onclick='prExportEstudo()'>💾 Exportar caso (JSON)</button> "
+    +"<button class='c70b' onclick='prExportCSV()'>📄 Linha de estudo (CSV)</button>";
+  document.getElementById("pr-rel").innerHTML=h;
+};
+var _stepSlowN7=stepSlow;
+stepSlow=function(){
+  _stepSlowN7();
+  var a=S.assimilacao||0;
+  if(a>0&&S.studyPontos){
+    var ultimo={};
+    for(var i=0;i<S.studyPontos.length;i++){ var p=S.studyPontos[i]; ultimo[p.var]=p; }
+    for(var v in ultimo){ if(REG[v]&&typeof S.params[v]==="number")
+      setP(v, lerp(getP(v), ultimo[v].val, a), "motor"); }
+  }
+};
+var _desenhar=desenharGrafico;
+desenharGrafico=function(){
+  _desenhar();
+  if(!S||!S.studyPontos||!S.studyPontos.length) return;
+  var canvas=document.getElementById("graf-canvas"); if(!canvas) return;
+  var ctx=canvas.getContext("2d");
+  var escala=document.getElementById("graf-escala").value;
+  var janela=escala==="dia"?365*1440:100*60;
+  var t0=S.t-janela;
+  var dados=(escala==="dia")?S.histDia:S.histHora; if(!dados||dados.length<2) return;
+  dados=dados.slice(-(escala==="dia"?365:100));
+  var vals=[];
+  for(var i=0;i<dados.length;i++){ var vv=dados[i].v&&dados[i].v[grafVar]; if(vv&&typeof vv.avg==="number") vals.push(vv.avg); }
+  if(vals.length<2) return;
+  var min=Math.min.apply(null,vals), max=Math.max.apply(null,vals), range=(max-min)||1;
+  var r=REG[grafVar];
+  if(r&&r.faixa_fisio){ if(r.faixa_fisio[0]<min)min=r.faixa_fisio[0]; if(r.faixa_fisio[1]>max)max=r.faixa_fisio[1]; range=(max-min)||1; }
+  for(i=0;i<S.studyPontos.length;i++){ var p=S.studyPontos[i];
+    if(p.var!==grafVar||p.t<t0) continue;
+    var x=(p.t-t0)/janela*canvas.width;
+    var y=canvas.height-(p.val-min)/range*canvas.height;
+    ctx.fillStyle="#f87171"; ctx.beginPath(); ctx.arc(x,y,4,0,6.283); ctx.fill();
+    ctx.strokeStyle="#fff"; ctx.lineWidth=1; ctx.stroke();
+  }
+};
+function baixar(txt,nome,mime){
+  var a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([txt],{type:mime})); a.download=nome; a.click();
+}
+window.prExportEstudo=function(){
+  if(!S.study) return;
+  var dados={ tipo:"cortex70_caso", versao:SCHEMA_VERSION, estudo:S.study,
+    paciente:{sexo:S.cfg.sexo, idade:getP("idade"), peso_kg:getP("peso_kg"), altura_m:getP("altura_m"),
+      perfil:S.cfg.perfil, apoe_risco:getP("apoe_risco")},
+    params:S.params, pontos_reais:S.studyPontos, t_simulado:S.t };
+  baixar(JSON.stringify(dados,null,2),"caso_"+S.study.id+"_"+S.study.visita+".json","application/json");
+};
+window.prExportCSV=function(){
+  if(!S.study) return;
+  var ids=REG_ORDER.filter(function(id){ return id.indexOf("drug_")!==0&&typeof S.params[id]==="number"; });
+  var cab=["estudo_id","visita","t_min"].concat(ids);
+  var lin=[S.study.id,S.study.visita,S.t].concat(ids.map(function(id){ return (+S.params[id]).toFixed(3).replace(".",","); }));
+  baixar("﻿"+cab.join(";")+"\n"+lin.join(";"),"estudo_"+S.study.visita+".csv","text/csv");
+};
+addLog("fx","🧍 Módulo Paciente Real carregado (N7)");
+})();
+
+/* ================================================================
+CÓRTEX-70 v5 — N8: SANGUE • INTOXICAÇÃO CEREBRAL • RESPIRAÇÃO
+================================================================ */
+(function(){
+P("fio2","estado","respiracao",21,"%",{fis:[21,21],plaus:[10,100]});
+P("volume_corrente","estado","respiracao",470,"mL",{fis:[400,550],plaus:[200,800]});
+P("ventilacao_min","estado","respiracao",7.5,"L/min",{fis:[5,9],plaus:[1,30]});
+P("gradiente_aa","estado","respiracao",8,"mmHg",{fis:[5,15],plaus:[0,500]});
+P("o2_conteudo","estado","sangue",20,"mL O₂/dL",{fis:[17,22],plaus:[0,25]});
+P("o2_er","estado","sangue",25,"%",{fis:[20,35],plaus:[5,95]});
+P("cohb","estado","sangue",0.5,"%",{fis:[0,2],plaus:[0,60]});
+P("etanol_mgdl","estado","sangue",0,"mg/dL",{fis:[0,5],plaus:[0,500]});
+P("hba1c","estado","sangue",5.2,"%",{fis:[4.5,5.7],plaus:[3,20]});
+P("lipemia","estado","sangue",0,"turbidez 0-10",{fis:[0,2],plaus:[0,10]});
+P("cetonas","estado","sangue",0.2,"mmol/L",{fis:[0.1,0.6],plaus:[0,10]});
+P("amonia","estado","sangue",35,"µmol/L",{fis:[15,60],plaus:[5,400]});
+P("tox_uremica","estado","sangue",5,"score 0-100",{fis:[0,30],plaus:[0,100]});
+P("contaminacao_sanguinea","estado","sangue",5,"endotoxina 0-100",{fis:[0,15],plaus:[0,100]});
+P("chumbo_ugdl","estado","sangue",1,"µg/dL",{fis:[0,5],plaus:[0,150]});
+P("metal_pesados","estado","sangue",5,"score 0-100",{fis:[0,15],plaus:[0,100]});
+P("imc","estado","paciente",24.8,"kg/m²",{fis:[19,28],plaus:[12,60]});
+P("adiposidade_visceral","estado","sangue",20,"0-100",{fis:[10,40],plaus:[0,100]});
+P("oxldl","estado","sangue",40,"mg/dL",{fis:[20,80],plaus:[0,300]});
+P("peroxidacao_lipidica","estado","sangue",10,"0-200",{fis:[0,30],plaus:[0,200]});
+P("esteatose_hepatica","estado","sangue",5,"0-100",{fis:[0,10],plaus:[0,100]});
+P("rso2_cerebral","estado","cerebro",70,"%",{fis:[60,80],plaus:[30,100]});
+P("glicolinfatico","estado","cerebro",100,"%",{fis:[60,130],plaus:[5,200]});
+P("excitotoxicidade","estado","cerebro",10,"0-100",{fis:[0,25],plaus:[0,100]});
+P("neurotox_score","estado","cerebro",8,"0-100",{fis:[0,30],plaus:[0,100]});
+P("edema_cerebral","estado","cerebro",0,"0-100",{fis:[0,5],plaus:[0,100]});
+P("encefalopatia_grau","estado","cerebro",0,"0-4",{fis:[0,0],plaus:[0,4]});
+P("infeccao_ativa","estado","sangue",0,"0/1",{fis:[0,0],plaus:[0,1]});
+var _sfN8=stepFast;
+stepFast=function(){
+  _sfN8();
+  var dorm=(getP("sono_fase")>0)?1:0, iah=getP("apneia_iah");
+  var pio2=(760-47)*getP("fio2")/100;
+  setP("gradiente_aa",clamp(pio2-getP("po2"),0,500),"motor");
+  setP("ventilacao_min",clamp(getP("fr")*getP("volume_corrente")/1000,1,30),"motor");
+  setP("cohb",lerp(getP("cohb"),clamp(0.4+getP("tabagismo")*0.5,0,40),0.002),"motor");
+  var dow=Math.floor(S.t/1440)%7;
+  var et_alvo=getP("alcool")*(dow>=4?8:1.5);
+  setP("etanol_mgdl",clamp(getP("etanol_mgdl")+(et_alvo-getP("etanol_mgdl"))*0.001-0.18,0,500),"motor");
+  if(dorm&&iah>8) setP("spo2",clamp(getP("spo2")-iah*0.35*(0.5+rand()),75,100),"motor");
+  var cao2=1.34*getP("hb")*(1-getP("cohb")/100)*getP("spo2")/100+0.003*getP("po2");
+  setP("o2_conteudo",clamp(cao2,0,25),"motor");
+  setP("o2_er",clamp(100*(1.15-getP("cbf")/55+(100-getP("mito_potencial"))/250),5,95),"motor");
+  var rso2=100*(0.72*(getP("spo2")/100-getP("cohb")/220)+0.28*Math.min(1.2,getP("cbf")/50));
+  setP("rso2_cerebral",clamp(lerp(getP("rso2_cerebral"),rso2,0.05),30,100),"motor");
+  var exc=Math.max(0,getP("glutamato")-125)*2+Math.max(0,70-getP("mito_potencial"))*0.8+Math.max(0,55-getP("rso2_cerebral"))*1.2;
+  setP("excitotoxicidade",clamp(lerp(getP("excitotoxicidade"),exc,0.02),0,100),"motor");
+};
+var _smN8=stepMid;
+stepMid=function(){
+  _smN8();
+  var g=getP("glicose"), bmi=getP("peso_kg")/(getP("altura_m")*getP("altura_m"));
+  setP("imc",bmi,"motor");
+  setP("hba1c",clamp(lerp(getP("hba1c"),5.0+Math.max(0,g-92)*0.012+getP("homa_ir")*0.10,0.01),3,20),"motor");
+  setP("lipemia",clamp(lerp(getP("lipemia"),Math.max(0,getP("triglicerideos")-150)/80,0.05),0,10),"motor");
+  setP("cetonas",clamp(lerp(getP("cetonas"),(g<75?1.2:(g<90?0.6:0.18))+(getP("drug_jejum_on")>0.5?1.6:0),0.02),0,10),"motor");
+  setP("adiposidade_visceral",clamp(lerp(getP("adiposidade_visceral"),clamp((bmi-22)*4+getP("homa_ir")*4,0,100),0.01),0,100),"motor");
+  setP("oxldl",clamp(getP("ldl")*(0.35+getP("ros")/28),0,300),"motor");
+  setP("peroxidacao_lipidica",clamp(lerp(getP("peroxidacao_lipidica"),getP("oxldl")*0.12+getP("ros")*0.8,0.02),0,200),"motor");
+  setP("esteatose_hepatica",clamp(lerp(getP("esteatose_hepatica"),
+    clamp((getP("homa_ir")-1)*9+Math.max(0,getP("triglicerideos")-150)*0.09+Math.max(0,getP("ggt")-30)*0.35+Math.max(0,bmi-25)*2,0,100),0.01),0,100),"motor");
+  setP("amonia",clamp(lerp(getP("amonia"),
+    clamp(20+getP("ureia")*0.6+Math.max(0,4.2-getP("albumina"))*30+getP("esteatose_hepatica")*0.3,10,400),0.02),5,400),"motor");
+  setP("tox_uremica",clamp(lerp(getP("tox_uremica"),clamp(getP("ureia")*0.7+getP("creatinina")*12,0,100),0.02),0,100),"motor");
+  setP("chumbo_ugdl",clamp(lerp(getP("chumbo_ugdl"),1+getP("tabagismo")*0.06+getP("idade")*0.02,0.0005),0,150),"motor");
+  setP("metal_pesados",clamp(getP("chumbo_ugdl")*1.2,0,100),"motor");
+  var cont_alvo=clamp(5+getP("permeab_intestinal")*0.9+(getP("infeccao_ativa")>0.5?55:0)+Math.max(0,getP("il6")-8)*2,0,100);
+  setP("contaminacao_sanguinea",lerp(getP("contaminacao_sanguinea"),cont_alvo,0.01),"motor");
+  if((S.sepsisDias||0)>0){
+    S.sepsisDias--;
+    setP("temp",clamp(getP("temp")+0.8,34,41),"motor");
+    setP("fc",clamp(getP("fc")+18,40,200),"motor");
+    setP("il6",getP("il6")*1.5+5,"motor");
+    setP("microglia_m1",clamp(getP("microglia_m1")+25,0,100),"motor");
+    setP("imunocompetencia",clamp(getP("imunocompetencia")-15,20,150),"motor");
+    setP("risco_morte_ano",getP("risco_morte_ano")+2,"motor");
+    if(S.sepsisDias===0){ setP("infeccao_ativa",0,"trava"); addEvento("🦠 Sepse superada"); }
+  } else if(getP("contaminacao_sanguinea")>70&&rand()<0.02){
+    S.sepsisDias=72; addEvento("🦠 SEPSE — delirium, neuroinflamação e risco de óbito");
+  }
+  setP("glicolinfatico",clamp(lerp(getP("glicolinfatico"),
+    clamp(getP("sono_n3_min")/70*100-getP("idade_biologica")*0.3+getP("bdnf")*0.08,5,200),0.005),5,200),"motor");
+  setP("limpeza_celular",lerp(getP("limpeza_celular"),0.55*getP("autofagia")+0.45*getP("glicolinfatico"),0.02),"motor");
+  var edema=clamp(Math.max(0,58-getP("rso2_cerebral"))*1.2,0,60)+clamp((getP("tox_uremica")-70)*0.3,0,30)+(S.perfilExtra==="tce"?15:0);
+  setP("edema_cerebral",lerp(getP("edema_cerebral"),edema,0.02),"motor");
+  setP("pic",clamp(lerp(getP("pic"),10+getP("edema_cerebral")*0.25,0.02),5,45),"motor");
+  setP("sangue_qualidade",clamp(100-getP("cohb")*2.2-Math.max(0,getP("hba1c")-5.2)*7-getP("lipemia")*2.5
+    -Math.max(0,getP("lactato")-2)*3-getP("tox_uremica")*0.35-getP("contaminacao_sanguinea")*0.35
+    -Math.max(0,getP("amonia")-50)*0.25,0,100),"motor");
+  setP("neurotox_score",clamp(getP("amonia")*0.22+getP("tox_uremica")*0.35+getP("cohb")*1.8
+    +getP("etanol_mgdl")*0.12+getP("contaminacao_sanguinea")*0.3+getP("excitotoxicidade")*0.4
+    +getP("metal_pesados")*0.25,0,100),"motor");
+};
+function evOnce(k,cond,txt){ S._ev=S._ev||{}; if(cond&&!S._ev[k]){S._ev[k]=1;addEvento(txt);} if(!cond)S._ev[k]=0; }
+var _ssN8=stepSlow;
+stepSlow=function(){
+  _ssN8();
+  var ntx=getP("neurotox_score"), rso2=getP("rso2_cerebral");
+  var grau=clamp((ntx>25?1:0)+(ntx>45?1:0)+(ntx>65?1:0)+(ntx>85?1:0)+(rso2<52?1:0)+((S.sepsisDias||0)>0?1:0),0,4);
+  if(grau>getP("encefalopatia_grau")) addEvento("🧠 Encefalopatia grau "+grau+" (neurotoxinas "+ntx.toFixed(0)+")");
+  setP("encefalopatia_grau",grau,"motor");
+  if(grau>0) setP("mmse",Math.max(0,getP("mmse")-0.6*grau),"motor");
+  if(ntx>50){ var d=(ntx-50)*0.0004;
+    setP("neuronio_hipocampo",Math.max(0,getP("neuronio_hipocampo")-d),"motor");
+    setP("neuronio_frontal",Math.max(0,getP("neuronio_frontal")-d*0.7),"motor"); }
+  if(getP("etanol_mgdl")>40) setP("neurogenese",Math.max(0,getP("neurogenese")-0.3),"motor");
+  evOnce("hep", getP("amonia")>100&&getP("albumina")<3.5, "⚠ Encefalopatia hepática (amônia "+getP("amonia").toFixed(0)+" µmol/L)");
+  evOnce("urem", getP("tox_uremica")>80, "⚠ Encefalopatia urêmica (toxina "+getP("tox_uremica").toFixed(0)+")");
+  evOnce("co", getP("cohb")>20, "☣ Intoxicação por monóxido de carbono (COHb "+getP("cohb").toFixed(0)+"%)");
+  evOnce("et", getP("etanol_mgdl")>200, "🍷 Intoxicação alcoólica aguda ("+getP("etanol_mgdl").toFixed(0)+" mg/dL)");
+  evOnce("lac", getP("lactato")>4, "⚠ Acidose láctica (lactato "+getP("lactato").toFixed(1)+")");
+  evOnce("pb", getP("chumbo_ugdl")>40, "☣ Intoxicação por chumbo ("+getP("chumbo_ugdl").toFixed(0)+" µg/dL)");
+  evOnce("stea", getP("esteatose_hepatica")>50, "🫁 Esteatose hepática avançada — risco de encefalopatia");
+};
+CARTOES.push(
+ ["sangue_qualidade","Qualid. sangue",100],["neurotox_score","Neurotoxinas",100],
+ ["rso2_cerebral","rSO₂ cerebral",100],["o2_er","Extração O₂",100],
+ ["cohb","COHb",60],["hba1c","HbA1c",20],["lipemia","Lipemia",10],
+ ["amonia","Amônia",400],["tox_uremica","Tox. urêmica",100],
+ ["contaminacao_sanguinea","Contam. sangue",100],["glicolinfatico","Glicolinfático",200],
+ ["esteatose_hepatica","Est. hepática",100],["edema_cerebral","Edema cerebral",100],
+ ["encefalopatia_grau","Encefalopatia",4],["excitotoxicidade","Excitotoxic.",100]);
+var _monN8=atualizarMonitor;
+atualizarMonitor=function(){
+  _monN8();
+  var v=["o2_conteudo","gradiente_aa","ventilacao_min","cetonas","oxldl","peroxidacao_lipidica",
+         "adiposidade_visceral","imc","chumbo_ugdl","pic","metal_pesados","fio2"];
+  var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;font-size:12px;margin-top:8px;border-top:1px solid var(--borda);padding-top:8px">';
+  for(var i=0;i<v.length;i++){ var r=REG[v[i]]; if(!r)continue;
+    h+='<div><span style="color:var(--tx2)">'+v[i]+':</span> <b>'+fmt(getP(v[i]))+'</b> '+esc(r.unidade)+'</div>'; }
+  document.getElementById("monitor-conteudo").innerHTML+=h+'</div>';
+};
+var bt=document.createElement("button"); bt.textContent="☣ Exposições";
+bt.onclick=function(){ document.getElementById("exp-ov").style.display="block"; };
+document.getElementById("topo").appendChild(bt);
+var css2="#exp-ov{position:fixed;inset:0;z-index:97;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center}"
++"#exp-ov .cx{background:var(--card);border:1px solid var(--borda);border-radius:12px;padding:16px;max-width:420px;width:92%}"
++"#exp-ov button{display:block;width:100%;margin:6px 0;padding:10px;border-radius:8px;border:1px solid var(--borda);background:var(--bg2);color:var(--tx);cursor:pointer;font-size:13px;text-align:left}"
++"#exp-ov button:hover{border-color:var(--acc)}";
+var st2=document.createElement("style"); st2.textContent=css2; document.head.appendChild(st2);
+var ov2=document.createElement("div"); ov2.id="exp-ov";
+ov2.innerHTML="<div class='cx'><b>☣ Exposições e emergências (didático)</b>"
++"<button onclick='c70exp(\"co\")'>☣ Intoxicação por CO (COHb → 25%)</button>"
++"<button onclick='c70exp(\"et\")'>🍷 Intoxicação alcoólica aguda (etanol → 300)</button>"
++"<button onclick='c70exp(\"sep\")'>🦠 Infecção/sepse</button>"
++"<button onclick='c70exp(\"hip\")'>🫁 Hipóxia ambiental (FiO₂ → 14%)</button>"
++"<button onclick='c70exp(\"reo\")'>💨 Reoxigenação (FiO₂ → 21%)</button>"
++"<button onclick='c70exp(\"des\")'>🧪 Desintoxicação/terapia (zera CO e etanol)</button>"
++"<button onclick='c70exp(\"fechar\")'>✕ Fechar</button></div>";
+document.body.appendChild(ov2);
+window.c70exp=function(k){
+  if(k==="fechar"){ ov2.style.display="none"; return; }
+  if(k==="co"){ setP("cohb",25,"trava"); addEvento("☣ Exposição a CO — rSO₂ caindo"); }
+  if(k==="et"){ setP("etanol_mgdl",300,"trava"); addEvento("🍷 Etanol 300 mg/dL"); }
+  if(k==="sep"){ setP("contaminacao_sanguinea",90,"trava"); setP("infeccao_ativa",1,"trava"); S.sepsisDias=72; addEvento("🦠 Sepse induzida"); }
+  if(k==="hip"){ setP("fio2",14,"trava"); addEvento("🫁 FiO₂ 14% — hipoxemia"); }
+  if(k==="reo"){ setP("fio2",21,"trava"); addEvento("💨 Reoxigenação"); }
+  if(k==="des"){ setP("cohb",1,"trava"); setP("etanol_mgdl",0,"trava"); setP("contaminacao_sanguinea",10,"trava"); setP("infeccao_ativa",0,"trava"); addEvento("🧪 Desintoxicação"); }
+  ov2.style.display="none"; renderTudo();
+};
+addLog("fx","☣ Módulo Sangue/Toxinas/Respiração carregado (N8)");
+})();
+
+/* ================================================================
+CÓRTEX-70 v5 — N9: PK CLÍNICA • TITULAÇÃO • BHE • SEGURANÇA
+================================================================ */
+(function(){
+var FR_RENAL={memantina:1,metformina:0.85,empagliflozina:0.35,lecanemabe:0.05,donanemabe:0.05,
+  aducanumabe:0.05,creatina:0.35,nac:0.25,zinco:0.5,magnesio:0.5,calcio_sup:0.5,
+  vitb12:0.3,omeprazol:0.15,galantamina:0.25,rivastigmina:0.25,donepezila:0.05,
+  aspirina:0.1,sertralina:0.05,escitalopram:0.05,duloxetina:0.1};
+var FR_HEP={atorvastatina:0.8,rosuvastatina:0.5,omeprazol:0.7,sertralina:0.5,escitalopram:0.4,
+  duloxetina:0.5,lorazepam:0.6,zolpidem:0.6,donepezila:0.4,rivastigmina:0.4,galantamina:0.4,metformina:0};
+var CNS_ALVOS={acetilcolina:1,memoria:1,executiva:1,serotonina:1,dopamina:1,gaba:1,humor:1,
+  noradrenalina:1,glutamato:1,sono_horas:1,melatonina_n:1,neuronio_tronco:1};
+function renalF(tfg,fr){
+  if(tfg>=90)return 1;
+  if(tfg>=60)return 1+fr*0.6*(90-tfg)/30;
+  if(tfg>=30)return 1+fr*(90-tfg)/45;
+  return Math.min(4,1+fr*2.2*(90-tfg)/60);
+}
+function hepF(stea,tgo,fr){
+  if(fr<=0)return 1;
+  return Math.min(2.5,1+fr*(stea/120+tgo/250));
+}
+var _sfN9=stepFarmacos;
+stepFarmacos=function(){
+  for(var i=0;i<DRUG_DEFS.length;i++){ var d=DRUG_DEFS[i];
+    if(d._t12base===undefined) d._t12base=d.t12;
+    d.t12=d._t12base
+      *renalF(getP("tfg"),FR_RENAL[d.id]!==undefined?FR_RENAL[d.id]:0.12)
+      *hepF(getP("esteatose_hepatica"),getP("tgo"),FR_HEP[d.id]!==undefined?FR_HEP[d.id]:0.15);
+  }
+  _sfN9();
+  var bheF=clamp(1.25-(getP("bhe_perm")-10)/30,0.4,1.25);
+  if(bheF<1) for(var k in S.fx) if(CNS_ALVOS[k]) S.fx[k]*=bheF;
+};
+function ajustarMgKg(){
+  ["lecanemabe","donanemabe","aducanumabe"].forEach(function(id){
+    if(getP("drug_"+id+"_on")>0.5&&getP("drug_"+id+"_dose")<=15)
+      setP("drug_"+id+"_dose",Math.round(10*getP("peso_kg")/70*10)/10,"trava");
+  });
+}
+window.c70DoseKg=function(id,mgkg){
+  setP("drug_"+id+"_dose",Math.round(mgkg*getP("peso_kg")*10)/10,"trava");
+  addLog("fx","💉 "+id+": "+mgkg+" mg/kg = "+getP("drug_"+id+"_dose")+" mg (peso "+getP("peso_kg")+" kg)");
+};
+var _cpN9=criarPaciente;
+criarPaciente=function(c){ var s=_cpN9(c); ajustarMgKg(); return s; };
+window.criarPaciente=criarPaciente;
+var TIT=[
+ {d:"losartana",    alvo:"pas",      meta:135, tol:8,  dir:-1},
+ {d:"amlodipina",   alvo:"pas",      meta:135, tol:8,  dir:-1},
+ {d:"atorvastatina",alvo:"ldl",      meta:70,  tol:10, dir:-1},
+ {d:"rosuvastatina",alvo:"ldl",      meta:70,  tol:10, dir:-1},
+ {d:"metformina",   alvo:"homa_ir",  meta:2.0, tol:0.4,dir:-1},
+ {d:"donepezila",   alvo:"mmse",     meta:26,  tol:1,  dir:1}
+];
+var bt=document.createElement("button"); bt.textContent="🎯 Titulação: OFF";
+bt.onclick=function(){ if(!S)return; S.titulacao=!S.titulacao; bt.textContent="🎯 Titulação: "+(S.titulacao?"ON":"OFF");
+  addLog("fx","🎯 Titulação automática "+(S.titulacao?"ligada":"desligada")); };
+document.getElementById("topo").appendChild(bt);
+var _smN9=stepMid;
+stepMid=function(){
+  _smN9();
+  if(!S) return;
+  if(S.titulacao===undefined) S.titulacao=false;
+  if(!S.titulacao) return;
+  if(S.t-(S.lastTit||0) < 14*1440) return;
+  S.lastTit=S.t;
+  for(var i=0;i<TIT.length;i++){ var t=TIT[i], def=DRUG_INDEX[t.d];
+    if(!def||getP("drug_"+t.d+"_on")<0.5) continue;
+    var v=getP(t.alvo), dose=getP("drug_"+t.d+"_dose"), erro=t.dir>0?(t.meta-v):(v-t.meta);
+    if(Math.abs(erro)<=t.tol) continue;
+    var nova=erro>0?Math.min(def.doseMax,dose*1.25):dose*0.75;
+    setP("drug_"+t.d+"_dose",Math.round(nova*10)/10,"trava");
+    addLog("fx","🎯 "+def.nome+": dose "+dose+"→"+Math.round(nova*10)/10+" ("+t.alvo+"="+v.toFixed(1)+", meta "+t.meta+")");
+  }
+  if(getP("tfg")<30&&getP("drug_metformina_on")>0.5){
+    setP("drug_metformina_on",0,"trava"); addEvento("⛔ Metformina suspensa — TFG<30 (risco de acidose láctica)");
+  }
+  if(getP("tfg")<25&&getP("drug_empagliflozina_on")>0.5){
+    setP("drug_empagliflozina_on",0,"trava"); addEvento("⛔ Empagliflozina suspensa — TFG<25");
+  }
+};
+function evOnce9(k,cond,txt){ S._ev9=S._ev9||{}; if(cond&&!S._ev9[k]){S._ev9[k]=1;addEvento(txt);} if(!cond)S._ev9[k]=0; }
+var _ssN9=stepSlow;
+stepSlow=function(){
+  _ssN9();
+  var on=function(id){ return getP("drug_"+id+"_on")>0.5; };
+  evOnce9("iaz_ssri", on("omeprazol")&&(on("sertralina")||on("escitalopram")),
+    "⚠ Interação: omeprazol + ISRS (CYP2C19) — monitorar serotonina/sedação");
+  evOnce9("bdz_ache", on("lorazepam")&&on("donepezila"),
+    "⚠ Interação: benzodiazepínico + inibidor de colinesterase — sonolência e quedas");
+  evOnce9("dupla_agreg", on("aspirina")&&on("clopidogrel"),
+    "⚠ Dupla antiagregação: risco de sangramento — evitar uso crônico combinado");
+  evOnce9("met_alcool", on("metformina")&&getP("alcool")>7,
+    "⚠ Metformina + álcool: risco de acidose láctica");
+  evOnce9("sglt_jejum", on("empagliflozina")&&on("jejum"),
+    "⚠ SGLT2i + jejum: risco de cetose/hipoglicemia");
+  if(on("aspirina")&&on("clopidogrel")){
+    S.sangramentoAcum=(S.sangramentoAcum||0)+1;
+    if(S.sangramentoAcum>60&&rand()<0.02){
+      setP("hb",Math.max(6,getP("hb")-2),"motor"); S.sangramentoAcum=0;
+      addEvento("🩸 Sangramento digestivo (dupla antiagregação) — Hb −2");
+    }
+  } else S.sangramentoAcum=0;
+  evOnce9("hipog", getP("glicose")<55, "⚠ Hipoglicemia ("+getP("glicose").toFixed(0)+" mg/dL) — confusão, sudorese");
+  if(getP("glicose")<45){ setP("neurotox_score",clamp(getP("neurotox_score")+10,0,100),"motor"); }
+  evOnce9("orto", getP("pas")<95&&(on("losartana")||on("amlodipina")),
+    "⚠ Hipotensão ortostática (PAS "+getP("pas").toFixed(0)+") — risco de queda; revisar doses");
+  var antiAmy=on("lecanemabe")||on("donanemabe")||on("aducanumabe");
+  if(S.ariaPausa&&S.t>=S.ariaPausa){
+    setP("drug_"+S.ariaDrug+"_on",1,"trava"); S.ariaPausa=0;
+    addLog("fx","▶ "+DRUG_INDEX[S.ariaDrug].nome+" retomado após pausa por ARIA");
+  }
+  if(antiAmy&&!S.ariaPausa){
+    var anticoag=(on("aspirina")||on("clopidogrel"))?0.2:0;
+    var risco=0.05+getP("apoe_risco")*0.09+anticoag+Math.max(0,getP("bhe_perm")-15)*0.004;
+    if(rand()<risco/365){
+      var qual=on("lecanemabe")?"lecanemabe":(on("donanemabe")?"donanemabe":"aducanumabe");
+      setP("drug_"+qual+"_on",0,"trava");
+      setP("edema_cerebral",clamp(getP("edema_cerebral")+35,0,100),"trava");
+      S.ariaPausa=S.t+20160; S.ariaDrug=qual;
+      addEvento("🧠 ARIA-E (edema por anticorpo anti-amiloide) — "+DRUG_INDEX[qual].nome+" pausado 14 dias, edema cerebral +");
+    }
+  }
+};
+addLog("fx","🎯 Módulo PK clínica + titulação + segurança carregado (N9)");
+})();
+
+/* ================================================================
+CÓRTEX-70 v5 — N10: EVENTOS CLÍNICOS
+================================================================ */
+(function(){
+P("risco_avc_ano","estado","eventos",1,"%/ano",{fis:[0.3,2],plaus:[0,100]});
+P("avd_score","estado","funcional",95,"0-100",{fis:[60,100],plaus:[0,100]});
+P("deficit_focal","estado","eventos",0,"0-100",{fis:[0,10],plaus:[0,100]});
+P("delirium","estado","eventos",0,"0/1",{fis:[0,0],plaus:[0,1]});
+P("hospitalizado","estado","eventos",0,"0/1",{fis:[0,0],plaus:[0,1]});
+P("institucionalizado","estado","eventos",0,"0/1",{fis:[0,0],plaus:[0,1]});
+P("quedas_ano","estado","eventos",0,"n/ano",{fis:[0,1],plaus:[0,100]});
+P("reabilitacao","estado","funcional",0,"0-100",{fis:[0,20],plaus:[0,100]});
+P("grip_strength","estado","funcional",100,"%",{fis:[70,120],plaus:[0,150]});
+P("fib_atrial","estado","coracao",0,"0/1",{fis:[0,0],plaus:[0,1]});
+(function(){
+  var def={id:"apixabana",nome:"Apixabana 5mg",classe:"anticoagulante",via:"oral",F:0.5,t12:12,
+    Vd:0.7,CL:0.3,EC50:0.4,Emax:0.7,Hill:1.1,intervaloH:12,doseMax:10,uniDose:"mg",
+    alvos:{risco_avc_ano:-0.65}};
+  DRUG_DEFS.push(def); DRUG_INDEX[def.id]=def;
+  P("drug_apixabana_on","estado","farmacia",0,"0/1",{fis:[0,0],plaus:[0,1]});
+  P("drug_apixabana_dose","estado","farmacia",5,"mg",{fis:[0,10],plaus:[0,20]});
+  P("drug_apixabana_adesao","estado","farmacia",1,"0-1",{fis:[0.8,1],plaus:[0,1]});
+  P("drug_apixabana_conc","estado","farmacia",0,"ng/mL",{fis:[0,1000],plaus:[0,10000]});
+})();
+var _smN10=stepMid;
+stepMid=function(){
+  _smN10();
+  setP("grip_strength",clamp(lerp(getP("grip_strength"),
+    0.75*getP("massa_muscular")+0.15*getP("vigor_global")+10-0.15*Math.max(0,getP("idade")-70),0.01),0,150),"motor");
+};
+var TERRIT={"frontal":0.22,"parietal":0.2,"temporal":0.2,"hipocampo":0.12,"occipital":0.08,"talamus":0.08,"tronco":0.06,"cerebelo":0.04};
+var DEFICIT={"frontal":"executiva","temporal":"linguagem","hipocampo":"memoria","parietal":"orientacao","occipital":"orientacao","tronco":"vigor_global","talamus":"memoria","cerebelo":"executiva"};
+function pickTerritory(){ var r=rand(),acc=0;
+  for(var t in TERRIT){ acc+=TERRIT[t]; if(r<=acc) return t; } return "frontal"; }
+function evOnce10(k,cond,txt){ S._ev10=S._ev10||{}; if(cond&&!S._ev10[k]){S._ev10[k]=1;addEvento(txt);} if(!cond)S._ev10[k]=0; }
+var _ssN10=stepSlow;
+stepSlow=function(){
+  _ssN10();
+  var on=function(id){ return getP("drug_"+id+"_on")>0.5; };
+  if(getP("fib_atrial")<0.5){
+    var pFA=(0.004+0.001*Math.max(0,getP("idade")-65)+(getP("pas")>145?0.006:0))*(on("losartana")?0.6:1);
+    if(rand()<pFA){ setP("fib_atrial",1,"trava"); addEvento("❤️ Fibrilação atrial diagnosticada — avaliar anticoagulação (CHA₂DS₂-VASc)"); }
+  }
+  var r=0.3
+    +0.06*Math.max(0,getP("idade")-60)
+    +(getP("pas")>140?0.8:0)
+    +(getP("fib_atrial")>0.5?(on("apixabana")?0.4:3):0)
+    +getP("tabagismo")*0.03
+    +(getP("ldl")>130?0.4:0)
+    +(getP("homa_ir")>3?0.5:0)
+    +(getP("apneia_iah")>15?0.5:0)
+    +(getP("esteatose_hepatica")>60?0.3:0);
+  if(on("atorvastatina")||on("rosuvastatina")) r*=0.7;
+  if(on("losartana")) r*=0.85;
+  setP("risco_avc_ano",clamp(r,0,100),"motor");
+  if(getP("vivo")>0.5&&rand()<r/100/365.25){
+    var terr=pickTerritory(), sev=rand(), magn=sev<0.5?rand()*8+4:(sev<0.85?rand()*12+10:rand()*20+20);
+    setP("neuronio_"+terr,Math.max(5,getP("neuronio_"+terr)-magn),"trava");
+    setP("deficit_focal",clamp(getP("deficit_focal")+magn*2,0,100),"trava");
+    setP("bhe_perm",clamp(getP("bhe_perm")+12,0,100),"motor");
+    setP("microglia_m1",clamp(getP("microglia_m1")+30,0,100),"motor");
+    setP("nfl",clamp(getP("nfl")+magn*1.5,0,500),"motor");
+    setP("cbf",clamp(getP("cbf")-15,10,100),"motor");
+    var tipo=sev<0.35?"AIT":"AVC "+(sev<0.85?"moderado":"grave");
+    addEvento("🧠 "+tipo+" em território "+terr+" — déficit em "+DEFICIT[terr]+" (−"+magn.toFixed(0)+"% neurônios)");
+    if(terr==="tronco"&&sev>0.8&&rand()<0.35){
+      S.morto=true; setP("vivo",0,"trava");
+      addEvento("☠ ÓBITO — AVC de tronco"); renderTudo(); return;
+    }
+    setP("risco_morte_ano",clamp(getP("risco_morte_ano")+sev*4,0,100),"motor");
+    S.reabDias=180;
+  }
+  if((S.reabDias||0)>0){
+    S.reabDias--;
+    var prog=(0.3*getP("bdnf")/100+0.4*getP("atividade_fisica")/3+0.3*getP("neurogenese")/100);
+    setP("reabilitacao",clamp(getP("reabilitacao")+prog*0.8,0,100),"motor");
+    var d=getP("deficit_focal");
+    setP("deficit_focal",Math.max(d*0.996,d-0.35*prog),"motor");
+    if(S.reabDias===0) addEvento("🏃 Reabilitação concluída — déficit residual "+getP("deficit_focal").toFixed(0)+"/100 (sequela permanente)");
+  }
+  var gatilho=(S.sepsisDias>0)||getP("glicose")<45||getP("etanol_mgdl")>250||
+              getP("hospitalizado")>0.5||getP("encefalopatia_grau")>=3;
+  if(getP("delirium")<0.5&&gatilho&&rand()<0.25){
+    setP("delirium",1,"trava"); S.deliriumDias=3+Math.floor(rand()*7);
+    addEvento("😵 DELIRIUM (agitação/confusão aguda) — piora cognição e prognóstico");
+  }
+  if(getP("delirium")>0.5){
+    setP("mmse",Math.max(0,getP("mmse")-0.8),"motor");
+    setP("microglia_m1",clamp(getP("microglia_m1")+2,0,100),"motor");
+    S.deliriumDias=(S.deliriumDias||5)-1;
+    if(S.deliriumDias<=0){ setP("delirium",0,"trava"); addEvento("😴 Delirium resolvido — cognição parcialmente recuperada"); }
+  }
+  var rQ=0.002
+    +(getP("pas")<95&&(on("losartana")||on("amlodipina"))?0.01:0)
+    +(on("lorazepam")?0.012:0)
+    +(getP("sonolencia")>60?0.008:0)
+    +(getP("grip_strength")<70?0.008:0)
+    +(getP("massa_muscular")<70?0.006:0)
+    +(getP("delirium")>0.5?0.015:0);
+  if(rand()<rQ){
+    setP("quedas_ano",getP("quedas_ano")+1,"motor");
+    if(rand()<0.18){
+      setP("hospitalizado",1,"trava"); S.hospDias=30;
+      setP("imunocompetencia",clamp(getP("imunocompetencia")-15,20,150),"motor");
+      setP("massa_muscular",clamp(getP("massa_muscular")-3,30,150),"motor");
+      setP("avd_score",clamp(getP("avd_score")-12,0,100),"motor");
+      setP("risco_morte_ano",clamp(getP("risco_morte_ano")+2,0,100),"motor");
+      addEvento("🦴 FRATURA por queda — internação 30 dias, descondicionamento");
+    } else addEvento("🧍 Queda sem fratura — revisar hipotensão/sedação");
+  }
+  if(getP("hospitalizado")>0.5){
+    if((S.hospDias=(S.hospDias||30)-1)<=0){ setP("hospitalizado",0,"trava"); addEvento("🏥 Alta hospitalar"); }
+    setP("massa_muscular",clamp(getP("massa_muscular")-0.15,30,150),"motor");
+    setP("imunocompetencia",clamp(getP("imunocompetencia")-0.5,20,150),"motor");
+  }
+  var avd=clamp(0.42*getP("mmse")*3.3+0.18*getP("massa_muscular")+0.15*getP("vigor_global")
+    +0.10*getP("memoria")+0.15*getP("grip_strength")
+    -getP("delirium")*25-getP("deficit_focal")*0.25-(getP("hospitalizado")>0.5?20:0),0,100);
+  setP("avd_score",lerp(getP("avd_score"),avd,0.15),"motor");
+  if(getP("institucionalizado")<0.5&&getP("mmse")<12&&getP("avd_score")<40
+     &&(getP("quedas_ano")>=2||getP("delirium")>0.5)){
+    setP("institucionalizado",1,"trava");
+    setP("atividade_fisica",Math.max(0,getP("atividade_fisica")-0.5),"motor");
+    setP("estresse",clamp(getP("estresse")+10,0,100),"motor");
+    addEvento("🏠 INSTITUCIONALIZAÇÃO — dependência funcional total");
+  }
+  evOnce10("fa_alerta",getP("fib_atrial")>0.5&&!on("apixabana"),
+    "❤️ FA sem anticoagulação — risco de AVC 5-7× maior; considere apixabana (💊 Fármacos)");
+  evOnce10("sang_anticoag",on("apixabana")&&on("aspirina"),
+    "⚠ Apixabana + AAS: sangramento — indicação dupla questionável");
+};
+CARTOES.push(["risco_avc_ano","Risco AVC",100],["avd_score","AVD (Lawton)",100],
+  ["deficit_focal","Déficit pós-AVC",100],["quedas_ano","Quedas/ano",50],
+  ["grip_strength","Força preensão",150],["fib_atrial","Fibril. atrial",1],
+  ["reabilitacao","Reabilitação",100]);
+var bt=document.createElement("button"); bt.textContent="🏥 Clínica";
+bt.onclick=function(){ document.getElementById("cli-ov").style.display="flex"; };
+document.getElementById("topo").appendChild(bt);
+var st=document.createElement("style");
+st.textContent="#cli-ov{position:fixed;inset:0;z-index:97;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center}"
++"#cli-ov .cx{background:var(--card);border:1px solid var(--borda);border-radius:12px;padding:16px;max-width:400px;width:92%}"
++"#cli-ov button{display:block;width:100%;margin:6px 0;padding:10px;border-radius:8px;border:1px solid var(--borda);background:var(--bg2);color:var(--tx);cursor:pointer;font-size:13px;text-align:left}";
+document.head.appendChild(st);
+var ov=document.createElement("div"); ov.id="cli-ov";
+ov.innerHTML="<div class='cx'><b>🏥 Eventos clínicos (didático)</b>"
++"<button onclick='c70cli(\"avc\")'>🧠 Induzir AVC</button>"
++"<button onclick='c70cli(\"ait\")'>⚡ Induzir AIT</button>"
++"<button onclick='c70cli(\"del\")'>😵 Induzir delirium</button>"
++"<button onclick='c70cli(\"queda\")'>🧍 Induzir queda com fratura</button>"
++"<button onclick='c70cli(\"fa\")'>❤️ Induzir fibrilação atrial</button>"
++"<button onclick='c70cli(\"fechar\")'>✕ Fechar</button></div>";
+document.body.appendChild(ov);
+window.c70cli=function(k){
+  if(k==="fechar"){ ov.style.display="none"; return; }
+  if(k==="avc"){ var t=pickTerritory(); setP("neuronio_"+t,Math.max(5,getP("neuronio_"+t)-15),"trava");
+    setP("deficit_focal",clamp(getP("deficit_focal")+30,0,100),"trava"); S.reabDias=180;
+    addEvento("🧠 AVC induzido ("+t+") — inicie reabilitação (exercício, BDNF)"); }
+  if(k==="ait"){ setP("deficit_focal",clamp(getP("deficit_focal")+8,0,100),"trava");
+    addEvento("⚡ AIT — déficit transitório, investigar causa"); }
+  if(k==="del"){ setP("delirium",1,"trava"); S.deliriumDias=5; addEvento("😵 Delirium induzido"); }
+  if(k==="queda"){ setP("quedas_ano",getP("quedas_ano")+1,"trava"); setP("hospitalizado",1,"trava"); S.hospDias=30;
+    addEvento("🦴 Queda com fratura — internado"); }
+  if(k==="fa"){ setP("fib_atrial",1,"trava"); addEvento("❤️ FA induzida — anticoagular?"); }
+  ov.style.display="none"; renderTudo();
+};
+addLog("fx","🏥 Módulo eventos clínicos carregado (N10) — apixabana adicionada ao catálogo");
+})();
+
+/* ================================================================
+CÓRTEX-70 v5 — N11: VALIDAÇÃO CIENTÍFICA
+================================================================ */
+(function(){
+var css="#v11-ov{position:fixed;inset:0;z-index:98;background:var(--bg);overflow-y:auto;padding:0 0 60px;display:none}"
++"#v11-ov .top{position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--borda);padding:8px 12px;display:flex;gap:6px;align-items:center;z-index:2}"
++"#v11-ov .bx{background:var(--card);border:1px solid var(--borda);border-radius:10px;margin:10px;padding:10px;font-size:12px}"
++"#v11-ov .bx h3{font-size:13px;color:var(--acc2);margin-bottom:6px}"
++"#v11-ov table{width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono)}"
++"#v11-ov td,#v11-ov th{padding:3px 5px;border-bottom:1px solid var(--borda);text-align:right}"
++"#v11-ov td:first-child,#v11-ov th:first-child{text-align:left}"
++"#v11-ov .ok{color:var(--ok)} #v11-ov .warn{color:var(--warn)} #v11-ov .bad{color:var(--bad)}"
++"#v11-ov select,#v11-ov button{padding:6px 9px;background:var(--bg2);border:1px solid var(--borda);border-radius:6px;color:var(--tx);font-size:12px;cursor:pointer}"
++"#v11-ov .prim{background:var(--acc);border-color:var(--acc)}";
+var st=document.createElement("style"); st.textContent=css; document.head.appendChild(st);
+var ov=document.createElement("div"); ov.id="v11-ov"; document.body.appendChild(ov);
+var b=document.createElement("button"); b.textContent="📊 Validação";
+b.onclick=abrir; document.getElementById("topo").appendChild(b);
+function mediana(a){ if(!a.length) return NaN; var s=a.slice().sort(function(x,y){return x-y;});
+  var m=s.length>>1; return s.length%2?s[m]:(s[m-1]+s[m])/2; }
+function pct(a,p){ if(!a.length) return NaN; var s=a.slice().sort(function(x,y){return x-y;});
+  var i=clamp(Math.floor(p*(s.length-1)),0,s.length-1); return s[i]; }
+function f2(v){ return v===undefined||v===null||isNaN(v)?"-":(Math.abs(v)>=100?v.toFixed(0):(Math.abs(v)>=10?v.toFixed(1):v.toFixed(2))); }
+function abrir(){
+  if(!S) return;
+  ov.style.display="block";
+  ov.innerHTML="<div class='top'><b>📊 Validação científica</b><span style='flex:1'></span>"
+   +"<button onclick='v11Fechar()'>✕ Fechar</button></div>"
+   +"<div class='bx'><h3>1) Estudo A/B multi-semente (K réplicas independentes)</h3>"
+   +"A = sem tratamento · B = tratamento atual · C = placebo (dose 0 — cego conceitual)<br><br>"
+   +"Réplicas: <select id='v11-k'><option value='6'>6</option><option value='12' selected>12</option><option value='20'>20</option></select> "
+   +"Horizonte: <select id='v11-dias'><option value='180' selected>180 dias</option><option value='365'>365 dias</option></select> "
+   +"<button class='prim' onclick='v11AB()'>▶ Rodar estudo</button>"
+   +"<div id='v11-res' style='margin-top:8px'></div></div>"
+   +"<div class='bx'><h3>2) Calibração vs literatura (slopes do histórico diário)</h3>"
+   +"<button onclick='v11Cal()'>↻ Recalcular</button><div id='v11-cal' style='margin-top:6px'></div></div>";
+  v11Cal();
+}
+window.v11Fechar=function(){ ov.style.display="none"; };
+function mkRep(seed, modo){
+  var c={schema_version:SCHEMA_VERSION,motor_version:MOTOR_VERSION,t:S.t,seed:seed,
+    rng:{s:seed},cfg:S.cfg,params:JSON.parse(JSON.stringify(S.params)),
+    log:[],events:[],fx:{},fxLento:{},histMin:[],histHora:[],histDia:[],ultHora:-1,ultDia:-1,
+    morto:!!S.morto,contHora:0,drugs:JSON.parse(JSON.stringify(S.drugs)),
+    perfilExtra:S.perfilExtra||null,assimilacao:0,studyPontos:[],sepsisDias:0};
+  for(var i=0;i<DRUG_DEFS.length;i++){ var id=DRUG_DEFS[i].id;
+    if(modo==="A") c.params["drug_"+id+"_on"]=0;
+    if(modo==="C") c.params["drug_"+id+"_dose"]=0.0001;
+  }
+  return c;
+}
+var EM=false;
+function rodarRep(clone,n){ var ant=S; S=clone;
+  try{ for(var i=0;i<n&&!S.morto;i++) tick(); }finally{ S=ant; } }
+var ENDP=["mmse","carga_amiloide","placa_amiloide","tau_hipocampo","neuronio_hipocampo",
+  "neuronio_frontal","nfl","gfap","bdnf","neurogenese","vigor_global","risco_morte_ano",
+  "avd_score","sangue_qualidade","idade"];
+window.v11AB=function(){
+  if(EM) return; EM=true;
+  if(JOGANDO) togglePlay();
+  var K=parseInt(document.getElementById("v11-k").value,10),
+      dias=parseInt(document.getElementById("v11-dias").value,10), total=dias*1440;
+  var resA=[],resB=[],resC=[],mortA=0,mortB=0,mortC=0,k=0;
+  var out=document.getElementById("v11-res");
+  function fim(){
+    EM=false;
+    var h="<table><tr><th>desfecho</th><th>A sem (med)</th><th>B com (med)</th><th>C placebo (med)</th>"
+        +"<th>Δ B−A [P25–P75]</th><th>Δ C−A</th></tr>";
+    for(var i=0;i<ENDP.length;i++){ var id=ENDP[i]; if(!REG[id]) continue;
+      var a=mediana(resA.map(function(r){return r[id];})),
+          b2=mediana(resB.map(function(r){return r[id];})),
+          c2=mediana(resC.map(function(r){return r[id];}));
+      var deltas=resB.map(function(r,j){ return r[id]-resA[j][id]; }).filter(function(x){return !isNaN(x);});
+      var delC=resC.map(function(r,j){ return r[id]-resA[j][id]; }).filter(function(x){return !isNaN(x);});
+      var cor=Math.abs(mediana(deltas))<Math.abs(mediana(delC))? " class='warn'":"";
+      h+="<tr><td>"+id+"</td><td>"+f2(a)+"</td><td>"+f2(b2)+"</td><td>"+f2(c2)+"</td>"
+        +"<td"+cor+">"+(mediana(deltas)>0?"+":"")+f2(mediana(deltas))+" ["+f2(pct(deltas,0.25))+"–"+f2(pct(deltas,0.75))+"]</td>"
+        +"<td>"+(mediana(delC)>0?"+":"")+f2(mediana(delC))+"</td></tr>";
+    }
+    h+="</table><div style='margin-top:6px'>Óbitos: A="+mortA+"/"+K+" · B="+mortB+"/"+K+" · C="+mortC+"/"+K
+      +" &nbsp; <button onclick='v11CSV()'>📄 Exportar réplicas (CSV)</button></div>"
+      +"<div style='color:var(--tx3)'>Se Δ C−A ≈ 0 mas Δ B−A ≠ 0 → efeito farmacológico real. Se Δ B−A ≈ Δ C−A → efeito placebo/contexto.</div>";
+    out.innerHTML=h;
+    window._v11={resA:resA,resB:resB,resC:resC,K:K,dias:dias,mortA:mortA,mortB:mortB,mortC:mortC};
+  }
+  function lote(){
+    var alvo=Math.min(k+2,K);
+    for(;k<alvo;k++){
+      var semente=(S.seed||1)*7919+k*104729;
+      var A=mkRep(semente,"A"),B=mkRep(semente,"B"),C=mkRep(semente,"C");
+      rodarRep(A,total); rodarRep(B,total); rodarRep(C,total);
+      function snap(c){ var o={}; for(var i=0;i<ENDP.length;i++) o[ENDP[i]]=c.params[ENDP[i]];
+        o._morto=c.morto?1:0; return o; }
+      resA.push(snap(A)); resB.push(snap(B)); resC.push(snap(C));
+      if(A.morto)mortA++; if(B.morto)mortB++; if(C.morto)mortC++;
+    }
+    out.textContent="Simulando... réplica "+k+"/"+K+" ("+(k*3)+" pacientes, "+dias+" d cada)";
+    if(k<K) setTimeout(lote,0); else fim();
+  }
+  setTimeout(lote,0);
+};
+window.v11CSV=function(){
+  var d=window._v11; if(!d) return;
+  var lin=["replica;braco;"+ENDP.join(";")+";morto"];
+  for(var i=0;i<d.K;i++){ ["A","B","C"].forEach(function(br,ji){
+    var r=[d.resA,d.resB,d.resC][ji][i];
+    lin.push((i+1)+";"+br+";"+ENDP.map(function(id){return f2(r[id]).replace(".",",");}).join(";")+";"+r._morto);
+  });}
+  var a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["﻿"+lin.join("\n")],{type:"text/csv"}));
+  a.download="cortex70_estudo_ABC.csv"; a.click();
+};
+function slope(varId,dias){
+  var h=S.histDia; if(!h||h.length<10) return NaN;
+  var pts=h.slice(-Math.min(dias,h.length));
+  var n=pts.length, sx=0,sy=0,sxy=0,sxx=0;
+  for(var i=0;i<n;i++){ var x=pts[i].t/1440, y=pts[i].v[varId]?pts[i].v[varId].avg:NaN;
+    if(isNaN(y)) return NaN; sx+=x; sy+=y; sxy+=x*y; sxx+=x*x; }
+  var den=n*sxx-sx*sx; if(!den) return NaN;
+  return (n*sxy-sx*sy)/den;
+}
+window.v11Cal=function(){
+  var out=document.getElementById("v11-cal"); if(!out) return;
+  if(!S.histDia||S.histDia.length<10){ out.innerHTML="Sem histórico diário suficiente — avance pelo menos 10–15 dias."; return; }
+  var dias=Math.floor(S.histDia[S.histDia.length-1].t/1440 - S.histDia[0].t/1440);
+  var linhas=[];
+  var refMMSE={0:0,1:-2.5,2:-4.0,3:-6.0,4:-8.0}[Math.round(getP("estagio"))]||0;
+  var sMMSE=slope("mmse",dias)*365;
+  linhas.push(["Declínio MMSE (pts/ano)", sMMSE, refMMSE, refMMSE!==0?Math.abs(sMMSE-refMMSE)/Math.abs(refMMSE):Math.abs(sMMSE), "estágio "+Math.round(getP("estagio"))]);
+  var refNFL=8+0.25*Math.max(0,getP("idade")-30);
+  var vNFL=getP("nfl");
+  linhas.push(["NfL atual (pg/mL)", vNFL, refNFL, Math.abs(vNFL-refNFL)/refNFL, "curva etária"]);
+  var sAB=slope("carga_amiloide",dias)*365;
+  var refAB=getP("carga_amiloide")>=18?(getP("apoe_risco")>0?2.0:1.0):0.15;
+  linhas.push(["Acúmulo Aβ (CL/ano)", sAB, refAB, refAB>0.2?Math.abs(sAB-refAB)/refAB:Math.abs(sAB), getP("carga_amiloide")>=18?"A+":"A−"]);
+  var sTAU=slope("tau_hipocampo",dias)*365;
+  var refTAU=Math.min(6,Math.max(0.5,getP("braak_estagio")))*1.0;
+  linhas.push(["Propagação tau hipocampal (/ano)", sTAU, refTAU, Math.abs(sTAU-refTAU)/refTAU, "Braak "+Math.round(getP("braak_estagio"))]);
+  var h="<table><tr><th>parâmetro</th><th>seu simulado</th><th>referência</th><th>desvio</th><th>nota</th></tr>";
+  linhas.forEach(function(L){
+    var cl=L[3]<0.35?"ok":(L[3]<0.8?"warn":"bad");
+    var dev=L[3]<0.35?"✓ dentro":(L[3]<0.8?"~ aproximado":"✗ fora");
+    h+="<tr><td>"+L[0]+"</td><td>"+f2(L[1])+"</td><td>"+f2(L[2])+"</td><td class='"+cl+"'>"+dev+" ("+(L[3]*100).toFixed(0)+"%)</td><td>"+L[4]+"</td></tr>";
+  });
+  h+="</table><div style='color:var(--tx3);margin-top:4px'>Janela: "+dias+" dias. Referências didáticas (ordem de grandeza da literatura de DA). Desvio >80% sugere recalibrar constantes do motor.</div>";
+  out.innerHTML=h;
+};
+addLog("fx","📊 Módulo validação científica carregado (N11)");
+})();
+
+/* ================================================================
+CÓRTEX-70 v5 — N12: RELATÓRIO PDF PARA IMPRESSÃO
+================================================================ */
+(function(){
+var css="@media print{body>*{display:none!important}"
++"#rel-print{display:block!important;position:absolute;top:0;left:0;width:100%;background:#fff;color:#111;padding:24px;font-size:12px}"
++"#rel-print h1{font-size:18px;margin-bottom:4px} #rel-print h2{font-size:13px;margin:14px 0 4px;border-bottom:1px solid #999;padding-bottom:2px}"
++"#rel-print table{width:100%;border-collapse:collapse;font-size:11px;margin:4px 0}"
++"#rel-print td,#rel-print th{border:1px solid #bbb;padding:3px 6px;text-align:left}"
++"#rel-print .disc{font-size:10px;color:#555;margin-top:16px;border-top:1px solid #999;padding-top:6px}}"
++"#rel-print{display:none}";
+var st=document.createElement("style"); st.textContent=css; document.head.appendChild(st);
+var rel=document.createElement("div"); rel.id="rel-print"; document.body.appendChild(rel);
+var b=document.createElement("button"); b.textContent="🖨 Relatório";
+b.onclick=gerar; document.getElementById("topo").appendChild(b);
+function linha(ids){
+  var h="<tr>";
+  for(var i=0;i<ids.length;i++){ var id=ids[i]; if(!REG[id]) continue;
+    h+="<td><b>"+id+"</b><br>"+fmt(getP(id))+" "+esc(REG[id].unidade)+"</td>"; }
+  return h+"</tr>";
+}
+function gerar(){
+  if(!S) return;
+  var meds=DRUG_DEFS.filter(function(d){ return getP("drug_"+d.id+"_on")>0.5; });
+  var h="<h1>CÓRTEX-70 v5 — Relatório do paciente virtual</h1>"
+   +"<div>Gerado em "+new Date().toLocaleString("pt-BR")+" · t="+fmtT(S.t)
+   +(S.study?(" · Estudo: <b>"+esc(S.study.id)+"</b> · "+esc(S.study.visita)+" · "+esc(S.study.data||"")):"")+"</div>"
+   +"<h2>Identificação</h2><table>"+linha(["idade","sexo","peso_kg","altura_m","imc","idade_biologica","apoe_risco"])
+   +"</table><div>Perfil: "+esc(S.cfg.perfil||"—")+" · "+(S.morto?"<b>☠ ÓBITO</b>":"vivo")+"</div>"
+   +"<h2>Diagnóstico biológico</h2><table>"
+   +"<tr><td><b>AT(N)</b><br>"+(getP("atn_a")>0.5?"A+":"A−")+" "+(getP("atn_t")>0.5?"T+":"T−")+" "+(getP("atn_n")>0.5?"N+":"N−")+"</td>"
+   +"<td><b>Braak</b><br>"+fmt(getP("braak_estagio"))+"</td><td><b>CDR</b><br>"+fmt(getP("cdr"))+"</td>"
+   +"<td><b>Estágio</b><br>"+fmt(getP("estagio"))+"</td><td><b>MMSE</b><br>"+fmt(getP("mmse"))+"</td>"
+   +"<td><b>Encefalopatia</b><br>grau "+fmt(getP("encefalopatia_grau"))+"</td></tr></table>"
+   +"<h2>Biomarcadores</h2><table>"+linha(["ptau217","nfl","gfap","carga_amiloide","pet_amiloide","liquor_ab42","rm_vol_hipocampo"])
+   +"</table><h2>Cognição</h2><table>"+linha(["memoria","executiva","linguagem","orientacao","avd_score","vigor_global"])
+   +"</table><h2>Vitais e laboratório</h2><table>"+linha(["pas","pad","fc","spo2","glicose","hba1c","ldl","hdl","creatinina","tfg","hb","pcr"])
+   +"</table><h2>Sangue e toxinas</h2><table>"+linha(["sangue_qualidade","neurotox_score","rso2_cerebral","cohb","etanol_mgdl","amonia","tox_uremica","contaminacao_sanguinea","lipemia","esteatose_hepatica"])
+   +"</table><h2>Cérebro por região (% neurônios / tau)</h2><table><tr><th>região</th><th>neurônios</th><th>sinapses</th><th>saúde</th><th>tau</th><th>Aβ</th></tr>";
+  for(var i=0;i<REGIOES.length;i++){ var r=REGIOES[i];
+    h+="<tr><td>"+r+"</td><td>"+fmt(getP("neuronio_"+r))+"</td><td>"+fmt(getP("sinapse_"+r))+"</td><td>"
+      +fmt(getP("saude_"+r))+"</td><td>"+fmt(getP("tau_"+r))+"</td><td>"+fmt(getP("abeta_"+r))+"</td></tr>"; }
+  h+="</table><h2>Medicações ativas ("+meds.length+")</h2><table><tr><th>fármaco</th><th>dose</th><th>conc.</th><th>adesão</th></tr>";
+  for(i=0;i<meds.length;i++){ var d=meds[i];
+    h+="<tr><td>"+esc(d.nome)+"</td><td>"+fmt(getP("drug_"+d.id+"_dose"))+" "+esc(d.uniDose||"")+"</td><td>"
+      +fmt(getP("drug_"+d.id+"_conc"))+"</td><td>"+fmt(getP("drug_"+d.id+"_adesao"))+"</td></tr>"; }
+  h+="</table><h2>Eventos recentes</h2><ul style='margin:4px 0 0 16px'>";
+  var evs=S.events.slice(-12);
+  for(i=evs.length-1;i>=0;i--) h+="<li>["+fmtT(evs[i].t)+"] "+esc(evs[i].txt)+"</li>";
+  h+="</ul><div class='disc'>CÓRTEX-70 v5 — simulador didático de pesquisa. Não é dispositivo médico, não faz diagnóstico e não substitui julgamento clínico. Dados sintéticos e/ou anonimizados (LGPD).</div>";
+  rel.innerHTML=h;
+  window.print();
+}
+addLog("fx","🖨 Módulo relatório PDF carregado (N12)");
+})();
+
+</script>
+</body>
+</html>
